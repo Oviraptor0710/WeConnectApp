@@ -1,0 +1,58 @@
+# version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: weconnect_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: weconnect_root_2024
+      MYSQL_DATABASE: weconnect
+      MYSQL_USER: weconnect_user
+      MYSQL_PASSWORD: weconnect_pass_2024
+    ports:
+      - "3308:3308"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-P", "3308", "-u", "root", "-pweconnect_root_2024" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command: --port=3308 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+
+  backend:
+    build: ./backend
+    container_name: weconnect_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+
+  ws_server:
+    build: ./ws-server
+    container_name: weconnect_ws_server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Need to specify the SECRET_KEY directly or pass via env_file if shared
+      - SECRET_KEY=weconnect_super_secret_key_2024
+      - PORT=3000
+    volumes:
+      - ./ws-server:/app
+      - /app/node_modules
+
+volumes:
+  mysql_data:
+  uploads_data:
