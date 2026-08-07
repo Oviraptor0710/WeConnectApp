@@ -23,6 +23,7 @@
     "livekit-client": "^2.18.9",
     "pusher-js": "^8.5.0",
     "react-i18next": "^17.0.7",
+    "socket.io-client": "^4.8.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

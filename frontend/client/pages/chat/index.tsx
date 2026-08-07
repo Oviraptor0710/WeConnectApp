@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import Pusher from "pusher-js";
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
 import Navbar from "@/components/Navbar";
 import { API_BASE_URL } from "@/lib/api";
 import { getAccessToken, getCurrentUser } from "@/lib/auth";
+import { useChatSocket } from "@/hooks/useChatSocket";
 import {
   createOrGetConversation,
-  getPusherConfig,
   listConversations,
   listMessages,
   markConversationRead,
@@ -51,6 +50,7 @@ interface Message {
   translation?: string;
   isJapanese?: boolean;
   isRead?: boolean;
+  isSending?: boolean;
 }
 
 interface SearchResult {
@@ -872,11 +872,13 @@ function ChatMessage({
   participantAvatar,
   onTranslate,
   isTranslating,
+  isLastMyMessage,
 }: {
   msg: Message;
   participantAvatar?: string;
   onTranslate: (messageId: number) => Promise<void>;
   isTranslating: boolean;
+  isLastMyMessage?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -930,6 +932,21 @@ function ChatMessage({
           <span className={cn("text-[10px] text-[#6B7280] px-1", isMine && "text-right")}>
             {msg.time}
           </span>
+          {isMine && isLastMyMessage && msg.isRead && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đã xem
+            </span>
+          )}
+          {isMine && isLastMyMessage && msg.isSending && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đang gửi
+            </span>
+          )}
+          {isMine && isLastMyMessage && !msg.isSending && !msg.isRead && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đã gửi
+            </span>
+          )}
         </div>
       </div>
     );
@@ -952,6 +969,21 @@ function ChatMessage({
             <span className={cn("text-[10px] text-[#6B7280] px-1", isMine && "text-right")}>
               {msg.time}
             </span>
+            {isMine && isLastMyMessage && msg.isRead && (
+              <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+                Đã xem
+              </span>
+            )}
+            {isMine && isLastMyMessage && msg.isSending && (
+              <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+                Đang gửi
+              </span>
+            )}
+            {isMine && isLastMyMessage && !msg.isSending && !msg.isRead && (
+              <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+                Đã gửi
+              </span>
+            )}
           </div>
         </div>
       );
@@ -979,6 +1011,21 @@ function ChatMessage({
           <span className={cn("text-[10px] text-[#6B7280] px-1", isMine && "text-right")}>
             {msg.time}
           </span>
+          {isMine && isLastMyMessage && msg.isRead && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đã xem
+            </span>
+          )}
+          {isMine && isLastMyMessage && msg.isSending && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đang gửi
+            </span>
+          )}
+          {isMine && isLastMyMessage && !msg.isSending && !msg.isRead && (
+            <span className="text-[10px] text-[#6B7280] px-1 text-right mt-0.5">
+              Đã gửi
+            </span>
+          )}
         </div>
       </div>
     );
@@ -1042,10 +1089,25 @@ function ChatMessage({
       <div className="flex flex-col items-end gap-1 max-w-[85%] sm:max-w-[75%]">
         <div className="px-3 py-2.5 rounded-tl-2xl rounded-tr-none rounded-br-2xl rounded-bl-2xl bg-[#4A6741] shadow-sm">
           <p className="text-sm text-white leading-[1.625]">{msg.content}</p>
-          <div className="text-right opacity-80 mt-0.5">
+          <div className="flex justify-end items-center gap-1 opacity-80 mt-0.5">
             <span className="text-[10px] text-[#F1F5F0]">{msg.time}</span>
           </div>
         </div>
+        {isLastMyMessage && msg.isRead && (
+          <span className="text-[10px] text-[#6B7280] px-1 mt-0.5">
+            Đã xem
+          </span>
+        )}
+        {isLastMyMessage && msg.isSending && (
+          <span className="text-[10px] text-[#6B7280] px-1 mt-0.5">
+            Đang gửi
+          </span>
+        )}
+        {isLastMyMessage && !msg.isSending && !msg.isRead && (
+          <span className="text-[10px] text-[#6B7280] px-1 mt-0.5">
+            Đã gửi
+          </span>
+        )}
       </div>
     </div>
   );
@@ -1110,6 +1172,12 @@ function ChatWindow({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
+  const lastMyMessageId = useMemo(() => {
+    const myMessages = messages.filter(m => m.from === "me");
+    if (myMessages.length === 0) return null;
+    return myMessages[myMessages.length - 1].messageId;
+  }, [messages]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -1158,7 +1226,7 @@ function ChatWindow({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, conv?.id]);
+  }, [messages, conv?.id, typingUserId]);
 
   useEffect(() => {
     setInputValue("");
@@ -1250,11 +1318,7 @@ function ChatWindow({
           </div>
           <div>
             <h3 className="text-sm font-bold text-[#2D3A3A]">{conv.name}</h3>
-            {typingUserId === conv.participantId ? (
-              <p className="text-xs text-[#22C55E] font-medium">
-                Đang nhập...
-              </p>
-            ) : conv.isOnline && (
+            {conv.isOnline && (
               <p className="text-xs text-[#22C55E] font-medium">
                 {t("chat.active")}
               </p>
@@ -1299,8 +1363,23 @@ function ChatWindow({
             participantAvatar={conv.avatar}
             onTranslate={onTranslate}
             isTranslating={translatingIds.has(msg.messageId)}
+            isLastMyMessage={msg.messageId === lastMyMessageId}
           />
         ))}
+        {typingUserId === conv.participantId && (
+          <div className="flex items-start gap-3 max-w-[85%] sm:max-w-[75%] mt-2 pb-4">
+            <div className="pt-1 shrink-0">
+              <Avatar src={conv.avatar} size={32} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="px-4 py-3 rounded-tl-none rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-[#E2E8E2] bg-white shadow-sm w-fit flex items-center justify-center gap-1.5 h-[38px]">
+                <span className="w-2 h-2 bg-[#9CA3AF] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-2 h-2 bg-[#9CA3AF] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-2 h-2 bg-[#9CA3AF] rounded-full animate-bounce"></span>
+              </div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -1406,9 +1485,7 @@ export default function Index() {
   const [conversationError, setConversationError] = useState<string | null>(null);
   const [typingUserId, setTypingUserId] = useState<number | null>(null);
   const [translatingIds, setTranslatingIds] = useState<Set<number>>(new Set());
-  const pusherRef = useRef<Pusher | null>(null);
   const lastTypingStateRef = useRef(false);
-  const [pusherReady, setPusherReady] = useState(false);
   const [showChatWindowOnMobile, setShowChatWindowOnMobile] = useState(false);
   const { i18n } = useTranslation();
 
@@ -1539,69 +1616,11 @@ export default function Index() {
     lastTypingStateRef.current = false;
   }, [activeConv?.id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    let userChannelName = "";
-
-    async function connectPusher() {
-      const token = getAccessToken();
-      if (!token || currentUserId === null) return;
-
-      try {
-        const response = await getPusherConfig();
-        if (cancelled) return;
-
-        const pusher = new Pusher(response.data.key, {
-          cluster: response.data.cluster,
-          authEndpoint: `${API_BASE_URL}${response.data.auth_endpoint}`,
-          auth: {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        });
-
-        pusherRef.current = pusher;
-        userChannelName = `private-user-${currentUserId}`;
-        const userChannel = pusher.subscribe(userChannelName);
-        userChannel.bind("conversation:updated", (payload: ChatConversation) => {
-          const updated = toConversation(payload, currentUserId);
-          setConversations((items) =>
-            sortConversations([
-              updated,
-              ...items.filter((conversation) => conversation.id !== updated.id),
-            ])
-          );
-        });
-        setPusherReady(true);
-      } catch (error) {
-        console.warn("Pusher is not available for chat realtime", error);
-      }
-    }
-
-    connectPusher();
-    return () => {
-      cancelled = true;
-      setPusherReady(false);
-      if (pusherRef.current) {
-        if (userChannelName) {
-          pusherRef.current.unsubscribe(userChannelName);
-        }
-        pusherRef.current.disconnect();
-        pusherRef.current = null;
-      }
-    };
-  }, [currentUserId]);
-
-  useEffect(() => {
-    const pusher = pusherRef.current;
-    if (!pusherReady || !pusher || !activeConv || currentUserId === null) return;
-
-    const channelName = `private-conversation-${activeConv.conversationId}`;
-    const channel = pusher.subscribe(channelName);
-
-    channel.bind("chat:new", (payload: ApiChatMessage) => {
-      const nextMessage = toMessage(payload, currentUserId);
+  useChatSocket({
+    currentUserId,
+    activeConversationId: activeConv?.conversationId,
+    onNewMessage: (payload) => {
+      const nextMessage = toMessage(payload, currentUserId!);
       setMessages((items) =>
         items.some((message) => message.messageId === nextMessage.messageId)
           ? items
@@ -1612,49 +1631,41 @@ export default function Index() {
       if (payload.sender_id !== currentUserId) {
         markConversationRead(payload.conversation_id, payload.message_id).catch(() => {});
       }
-    });
-
-    channel.bind(
-      "chat:typing",
-      (payload: { conversation_id: number; user_id: number; is_typing: boolean }) => {
-        if (payload.user_id === currentUserId) return;
-        setTypingUserId(payload.is_typing ? payload.user_id : null);
-      }
-    );
-
-    channel.bind(
-      "chat:read",
-      (payload: { user_id: number; last_read_message_id?: number | null }) => {
-        if (payload.user_id === currentUserId) return;
-        setMessages((items) =>
-          items.map((message) =>
-            message.from === "me" &&
-            (!payload.last_read_message_id || message.messageId <= payload.last_read_message_id)
-              ? { ...message, isRead: true }
-              : message
-          )
-        );
-      }
-    );
-
-    channel.bind(
-      "chat:translated",
-      (payload: { message_id: number; translated_content: string }) => {
-        setMessages((items) =>
-          items.map((message) =>
-            message.messageId === payload.message_id
-              ? { ...message, translation: payload.translated_content }
-              : message
-          )
-        );
-      }
-    );
-
-    return () => {
-      channel.unbind_all();
-      pusher.unsubscribe(channelName);
-    };
-  }, [activeConv?.conversationId, currentUserId, pusherReady]);
+    },
+    onTyping: (payload) => {
+      if (payload.user_id === currentUserId) return;
+      setTypingUserId(payload.is_typing ? payload.user_id : null);
+    },
+    onRead: (payload) => {
+      if (payload.user_id === currentUserId) return;
+      setMessages((items) =>
+        items.map((message) =>
+          message.from === "me" &&
+          (!payload.last_read_message_id || message.messageId <= payload.last_read_message_id)
+            ? { ...message, isRead: true }
+            : message
+        )
+      );
+    },
+    onTranslated: (payload) => {
+      setMessages((items) =>
+        items.map((message) =>
+          message.messageId === payload.message_id
+            ? { ...message, translation: payload.translated_content }
+            : message
+        )
+      );
+    },
+    onConversationUpdated: (payload) => {
+      const updated = toConversation(payload, currentUserId!);
+      setConversations((items) =>
+        sortConversations([
+          updated,
+          ...items.filter((conversation) => conversation.id !== updated.id),
+        ])
+      );
+    }
+  });
 
   const handleSelectConversation = (id: string) => {
     setActiveConvId(id);

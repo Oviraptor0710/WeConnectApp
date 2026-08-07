@@ -34,11 +34,7 @@ export interface ChatMessage {
   is_read: boolean;
 }
 
-export interface PusherConfig {
-  key: string;
-  cluster: string;
-  auth_endpoint: string;
-}
+
 
 export function listConversations() {
   return apiFetch<{ data: ChatConversation[]; pagination: unknown }>("/api/v1/conversations");
@@ -101,9 +97,7 @@ export function translateMessage(messageId: number, targetLanguage: "VI" | "JA" 
   });
 }
 
-export function getPusherConfig() {
-  return apiFetch<{ data: PusherConfig }>("/api/v1/pusher/config");
-}
+
 
 export function uploadChatFile(file: File) {
   const formData = new FormData();

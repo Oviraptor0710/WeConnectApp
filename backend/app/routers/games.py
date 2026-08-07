@@ -21,7 +21,7 @@ from app.schemas.shiritori import (
 from app.utils import game_engine as ge
 from app.utils import shiritori_engine as she
 from app.utils import shiritori_service as shs
-from app.utils.pusher import trigger_event
+from app.utils.ws_broadcast import trigger_event
 
 router = APIRouter()
 

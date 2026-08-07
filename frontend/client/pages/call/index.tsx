@@ -8,9 +8,8 @@ import {
   useRoomContext,
 } from "@livekit/components-react";
 import { RoomEvent, Track } from "livekit-client";
-import Pusher from "pusher-js";
+import { io, Socket } from 'socket.io-client';
 import { getCurrentUser } from "@/lib/auth";
-import { getPusherConfig } from "@/lib/chatApi";
 import { API_BASE_URL } from "@/lib/api";
 import { fetchVideoToken, rejectCall } from "@/lib/videoApi";
 import { useTranslation } from "react-i18next";
@@ -70,24 +69,21 @@ function CallControls({
   }, [room]);
   // ── Listen for rejection + 35s no-answer timeout ─────────────────────────
   useEffect(() => {
-    let pusher: Pusher | null = null;
-    let cancelled = false;
+    let socket: Socket | null = null;
 
-    // ── Pusher: listen for "video:call-rejected" on own channel ──
+    // ── Socket.io: listen for "video:call-rejected" on own channel ──
     async function setupRejectionListener() {
       const user = getCurrentUser();
-      if (!user) return;
+      const token = localStorage.getItem("access_token");
+      if (!user || !token) return;
       try {
-        const config = await getPusherConfig();
-        if (cancelled) return;
-        const token = localStorage.getItem("access_token") ?? "";
-        pusher = new Pusher(config.data.key, {
-          cluster: config.data.cluster,
-          authEndpoint: `${API_BASE_URL}${config.data.auth_endpoint}`,
-          auth: { headers: { Authorization: `Bearer ${token}` } },
+        const WS_URL = (import.meta.env.VITE_WS_URL as string) || "";
+        socket = io(WS_URL, {
+          auth: { token },
+          transports: ['websocket'],
         });
-        const channel = pusher.subscribe(`private-user-${user.user_id}`);
-        channel.bind("video:call-rejected", (data: { reason: string }) => {
+        
+        socket.on("video:call-rejected", (data: { reason: string }) => {
           const msg =
             data.reason === "TIMEOUT"
               ? t("call.noAnswer")
@@ -98,7 +94,7 @@ function CallControls({
           setTimeout(onEnd, 2500);
         });
       } catch {
-        // Pusher optional — timeout still works
+        // Optional — timeout still works
       }
     }
 
@@ -114,9 +110,8 @@ function CallControls({
     }, 35_000);
 
     return () => {
-      cancelled = true;
       window.clearTimeout(timeoutId);
-      if (pusher) pusher.disconnect();
+      if (socket) socket.disconnect();
     };
   }, [room, onEnd]);
 

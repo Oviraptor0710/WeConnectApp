@@ -45,9 +45,9 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/.env
     environment:
-      # Need to specify the SECRET_KEY directly or pass via env_file if shared
-      - SECRET_KEY=weconnect_super_secret_key_2024
       - PORT=3000
     volumes:
       - ./ws-server:/app

@@ -21,7 +21,7 @@ from app.schemas.message import (
     TypingRequest,
 )
 from app.utils.media import save_chat_file
-from app.utils.pusher import authenticate_channel, trigger_event
+from app.utils.ws_broadcast import trigger_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -170,50 +170,7 @@ def _parse_channel_id(channel_name: str, prefix: str) -> int | None:
     return int(raw_id) if raw_id.isdigit() else None
 
 
-@router.get("/pusher/config")
-def get_pusher_config(current_user: User = Depends(get_current_user)):
-    if not settings.PUSHER_KEY or not settings.PUSHER_CLUSTER:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Pusher chưa được cấu hình")
-    return {
-        "data": {
-            "key": settings.PUSHER_KEY,
-            "cluster": settings.PUSHER_CLUSTER,
-            "auth_endpoint": "/api/v1/pusher/auth",
-        }
-    }
 
-
-@router.post("/pusher/auth")
-def authorize_pusher_channel(
-    socket_id: str = Form(...),
-    channel_name: str = Form(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    conversation_id = _parse_channel_id(channel_name, "private-conversation-")
-    user_id = _parse_channel_id(channel_name, "private-user-")
-    game_room_id = _parse_channel_id(channel_name, "private-game-room-")
-
-    if conversation_id is not None:
-        _get_conversation_for_user(db, conversation_id, current_user.user_id)
-    elif user_id is not None and user_id == current_user.user_id:
-        pass
-    elif game_room_id is not None:
-        from app.models.game import GameParticipant
-        member = db.query(GameParticipant).filter(
-            GameParticipant.room_id == game_room_id,
-            GameParticipant.user_id == current_user.user_id,
-            GameParticipant.left_at.is_(None),
-        ).first()
-        if not member:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền truy cập kênh game")
-    else:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền truy cập kênh Pusher")
-
-    auth = authenticate_channel(channel_name, socket_id)
-    if auth is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Pusher chưa được cấu hình")
-    return auth
 
 
 @router.get("/conversations")

@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8081,
+    allowedHosts: true,
     fs: {
       allow: ["./client", "./shared", "index.html"],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
@@ -24,6 +25,11 @@ export default defineConfig(({ mode }) => ({
       "/static": {
         target: "http://127.0.0.1:8001",
         changeOrigin: true,
+      },
+      "/socket.io": {
+        target: "http://127.0.0.1:3000",
+        changeOrigin: true,
+        ws: true,
       },
     },
   },

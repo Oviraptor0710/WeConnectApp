@@ -11,7 +11,7 @@ from app.schemas.video import (
     VideoTokenRequest,
     VideoTokenResponse,
 )
-from app.utils.pusher import trigger_event
+from app.utils.ws_broadcast import trigger_event
 
 router = APIRouter()
 

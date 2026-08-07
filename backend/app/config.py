@@ -23,11 +23,8 @@ class Settings(BaseSettings):
 
     GEMINI_API_KEY: str | None = None
 
-    PUSHER_APP_ID: str | None = None
-    PUSHER_KEY: str | None = None
-    PUSHER_SECRET: str | None = None
-    PUSHER_CLUSTER: str | None = None
-    PUSHER_SSL: bool = True
+    WS_SERVER_INTERNAL_URL: str = "http://ws_server:3000"
+
 
     LIVEKIT_URL: str | None = None
     LIVEKIT_API_KEY: str | None = None
