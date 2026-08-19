@@ -223,7 +223,7 @@ CREATE TABLE GAME_MESSAGES (
 -- ── 15. OTPS ─────────────────────────────────────────────────
 CREATE TABLE OTPS (
     otp_id     BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    identifier VARCHAR(255) NOT NULL,  -- email hoặc phone (chưa có user_id)
+    email      VARCHAR(255) NOT NULL,  -- Đổi từ identifier sang email do không hỗ trợ SMS
     code       VARCHAR(10)  NOT NULL,
     purpose    VARCHAR(50)  NOT NULL,  -- REGISTER | FORGOT_PASSWORD
     expire_at  TIMESTAMP    NOT NULL,
@@ -292,4 +292,4 @@ CREATE INDEX idx_event_reg_user       ON EVENT_REGISTRATIONS(user_id);
 
 CREATE INDEX idx_game_rooms_status    ON GAME_ROOMS(status);
 
-CREATE INDEX idx_otps_lookup          ON OTPS(identifier, code, used);
+CREATE INDEX idx_otps_lookup          ON OTPS(email, code, used);
