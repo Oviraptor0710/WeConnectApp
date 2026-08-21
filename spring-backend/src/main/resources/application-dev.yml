@@ -1,0 +1,6 @@
+# Cấu hình riêng cho môi trường Development (Code trên máy local)
+app:
+  cookie:
+    secure: false      # Tắt Secure để có thể test API qua HTTP thuần (Postman, localhost)
+    same-site: Lax     # Chặn một phần CSRF nhưng vẫn thân thiện khi test
+    domain: localhost  # Domain áp dụng cookie

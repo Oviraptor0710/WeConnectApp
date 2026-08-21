@@ -1,0 +1,10 @@
+# Cấu hình riêng cho môi trường Production (Deploy thật hoặc dùng Ngrok)
+app:
+  cookie:
+    secure: true               # Bật Secure bắt buộc phải dùng HTTPS mới gửi cookie
+    same-site: None            # Dùng None nếu Frontend và Backend khác domain (Ngrok). Nhớ đi kèm secure: true
+    domain: ${APP_DOMAIN:""}   # Đọc domain từ biến môi trường (ví dụ: ngrok.io)
+
+spring:
+  jpa:
+    show-sql: false # Tắt log câu lệnh SQL trên production để tiết kiệm CPU và ổ cứng
