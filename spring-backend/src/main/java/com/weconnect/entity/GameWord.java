@@ -27,10 +27,10 @@ public class GameWord {
     @Column(nullable = false, length = 100)
     private String category;
 
-    @Column(name = "jlpt_level")
+    @Column(name = "jlpt_level", columnDefinition = "TINYINT")
     private Integer jlptLevel; // TINYINT (có thể null)
 
-    @Column(name = "mora_count", nullable = false)
+    @Column(name = "mora_count", nullable = false, columnDefinition = "TINYINT")
     private Integer moraCount; // TINYINT
 
     @Column(name = "first_kana", nullable = false, length = 3)
@@ -39,5 +39,6 @@ public class GameWord {
     @Column(name = "last_kana", nullable = false, length = 3)
     private String lastKana;
 
+    @Column(columnDefinition = "TINYINT")
     private Integer difficulty = 1;
 }

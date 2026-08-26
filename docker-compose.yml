@@ -29,6 +29,10 @@ services:
     restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      # Spring là token issuer; legacy FastAPI chỉ verify bằng cùng key.
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
     ports:
       - "8001:8001"
     depends_on:
@@ -49,6 +53,7 @@ services:
       - ./backend/.env
     environment:
       - PORT=3000
+      - SECRET_KEY=${SECRET_KEY}
     volumes:
       - ./ws-server:/app
       - /app/node_modules
@@ -64,13 +69,14 @@ services:
     depends_on:
       - backend
       - ws_server
-      # Sẽ depends on node_backend khi nó sẵn sàng
-      # - node_backend
+      - spring_backend
 
   spring_backend:
     build: ./spring-backend
     container_name: weconnect_spring_backend
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8002:8080"
     depends_on:

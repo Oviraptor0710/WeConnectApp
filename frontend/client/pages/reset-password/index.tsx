@@ -31,7 +31,7 @@ export default function Index() {
         "/api/v1/auth/reset-password",
         {
           method: "POST",
-          body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+          body: JSON.stringify({ resetToken, newPassword }),
         },
         true
       );

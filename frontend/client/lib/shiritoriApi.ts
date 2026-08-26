@@ -130,11 +130,9 @@ export async function subscribeShiritoriRoom(
   } catch {
     return () => {};
   }
-  const token = localStorage.getItem("access_token");
   const pusher = new Pusher(config.data.key, {
     cluster: config.data.cluster,
     authEndpoint: `${API_BASE_URL}${config.data.auth_endpoint}`,
-    auth: { headers: { Authorization: `Bearer ${token}` } },
   });
   const channel = pusher.subscribe(`private-game-room-${roomId}`);
   const bind = <T>(evt: string, cb?: (d: T) => void) => { if (cb) channel.bind(evt, cb); };

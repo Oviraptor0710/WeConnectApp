@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -67,6 +67,10 @@ const featuredEvents = [
   },
 ];
 
+// Dữ liệu mock được giữ lại để dùng khi biểu đồ/ranking được nối API thật.
+void months;
+void featuredEvents;
+
 function TrendUpIcon({ color }: { color: string }) {
   return (
     <svg width="12" height="7" viewBox="0 0 12 7" fill="none">
@@ -113,7 +117,6 @@ function SmallStarIcon() {
 export default function Index() {
   const { t, i18n } = useTranslation();
   const [featuredTab, setFeaturedTab] = useState<"sao" | "dangky">("sao");
-  const location = useLocation();
   const isJa = i18n.language.startsWith("ja");
 
   const localizedFeaturedEvents = [

@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:weconnect;MODE=MySQL;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+
+app:
+  jwt:
+    secret: "test-secret-key-that-is-long-enough-for-hs256"
+    issuer: weconnect-auth
+    access-expiration-ms: 900000
+    refresh-expiration-ms: 2592000000
+  brevo:
+    api-key: test-key
+    from-email: test@example.com

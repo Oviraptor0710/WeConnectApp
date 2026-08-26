@@ -3,4 +3,4 @@ app:
   cookie:
     secure: false      # Tắt Secure để có thể test API qua HTTP thuần (Postman, localhost)
     same-site: Lax     # Chặn một phần CSRF nhưng vẫn thân thiện khi test
-    domain: localhost  # Domain áp dụng cookie
+    domain: ""         # Host-only cookie hoạt động ổn định trên localhost

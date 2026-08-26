@@ -1,11 +1,12 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
-import { saveTokens, clearTokens, getCurrentUser, isAuthenticated, CurrentUser } from "@/lib/auth";
+import { saveTokens, clearTokens, getCurrentUser, CurrentUser } from "@/lib/auth";
 
 interface AuthContextType {
   user: CurrentUser | null;
   isLoggedIn: boolean;
+  isAuthLoading: boolean;
   login: (identifier: string, password: string, from?: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: CurrentUser | null) => void;
@@ -15,21 +16,55 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(getCurrentUser);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const navigate = useNavigate();
 
-  const login = useCallback(async (identifier: string, password: string, from?: string) => {
-    console.log("[useAuth] Starting login for:", identifier);
-    const res = await apiFetch<{ data: { access_token: string; refresh_token: string; expires_in: number; user: CurrentUser } }>(
+  const mapUser = useCallback((res: { userId: number; email: string; fullName: string; role: string }): CurrentUser => ({
+    user_id: res.userId,
+    email: res.email,
+    full_name: res.fullName,
+    role: res.role,
+  }), []);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch<{ userId: number; email: string; fullName: string; role: string }>(
+      "/api/v1/auth/me",
+      { method: "GET" },
+      false,
+      false
+    )
+      .then((res) => {
+        if (!active) return;
+        const restoredUser = mapUser(res);
+        saveTokens(restoredUser);
+        setUser(restoredUser);
+      })
+      .catch(() => {
+        if (!active) return;
+        clearTokens();
+        setUser(null);
+      })
+      .finally(() => {
+        if (active) setIsAuthLoading(false);
+      });
+    return () => { active = false; };
+  }, [mapUser]);
+
+  const login = useCallback(async (email: string, password: string, from?: string) => {
+    console.log("[useAuth] Starting login for:", email);
+    const res = await apiFetch<{ userId: number; email: string; fullName: string; role: string; message: string }>(
       "/api/v1/auth/login",
-      { method: "POST", body: JSON.stringify({ identifier, password }) },
+      { method: "POST", body: JSON.stringify({ email, password }) },
       true
     );
-    console.log("[useAuth] Login response successful, saving tokens...");
-    saveTokens(res.data.access_token, res.data.refresh_token, res.data.user);
-    setUser(res.data.user);
-    console.log("[useAuth] Tokens saved, navigating to:", from || "/");
+    console.log("[useAuth] Login response successful, saving user info...");
+    const user = mapUser(res);
+    saveTokens(user);
+    setUser(user);
+    console.log("[useAuth] User saved, navigating to:", from || "/");
     navigate(from || "/");
-  }, [navigate]);
+  }, [mapUser, navigate]);
 
   const logout = useCallback(async () => {
     try { await apiFetch("/api/v1/auth/logout", { method: "POST" }); } catch {}
@@ -39,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn: isAuthenticated(), login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, isLoggedIn: !!user, isAuthLoading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );

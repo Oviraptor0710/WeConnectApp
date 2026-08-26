@@ -25,14 +25,28 @@ export default function Index() {
   const [loading, setLoading] = useState(false);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isAuthLoading, setUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (!isAuthLoading && isLoggedIn) {
       navigate("/", { replace: true });
     }
-  }, [isLoggedIn, navigate]);
+  }, [isAuthLoading, isLoggedIn, navigate]);
+
+  // Hàm API thuần: gọi send-otp, throw nếu lỗi (không bắt exception ở đây)
+  const sendOtpApi = async () => {
+    await apiFetch(
+      "/api/v1/auth/send-otp",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+        }),
+      },
+      true
+    );
+  };
 
   const handleRegister = async () => {
     setError("");
@@ -48,14 +62,17 @@ export default function Index() {
         {
           method: "POST",
           body: JSON.stringify({
-            identifier: trimmedEmail,
-            identifier_type: "EMAIL",
+            email: trimmedEmail,
             password,
-            full_name: fullName,
+            fullName: fullName,
           }),
         },
         true
       );
+
+      // Gọi API gửi OTP — nếu Brevo thất bại, lỗi sẽ throw lên đây
+      await sendOtpApi();
+
       setStep("otp_sent");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("auth.register.errorDefault"));
@@ -64,21 +81,12 @@ export default function Index() {
     }
   };
 
+  // Hàm UI: Nút "Gửi lại OTP" — bắt lỗi và hiển thị cho người dùng
   const handleResendOtp = async () => {
     setError("");
     setLoading(true);
     try {
-      await apiFetch(
-        "/api/v1/auth/otp/send",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            identifier: email.trim(),
-            purpose: "REGISTER",
-          }),
-        },
-        true
-      );
+      await sendOtpApi();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("auth.register.errorOtp"));
     } finally {
@@ -90,19 +98,30 @@ export default function Index() {
     setError("");
     setLoading(true);
     try {
-      const res = await apiFetch<{ data: { access_token: string; refresh_token: string; expires_in: number; user: { user_id: number; full_name: string; role: string } } }>(
-        "/api/v1/auth/otp/verify",
+      const res = await apiFetch<{ userId: number; email: string; fullName: string; role: string; message: string }>(
+        "/api/v1/auth/verify-otp",
         {
           method: "POST",
           body: JSON.stringify({
-            identifier: email.trim(),
-            code: otp.join(""),
-            purpose: "REGISTER",
+            email: email.trim(),
+            otpCode: otp.join(""),
           }),
         },
         true
       );
-      saveTokens(res.data.access_token, res.data.refresh_token, res.data.user);
+
+      // Lưu user info vào localStorage
+      const currentUser = {
+        user_id: res.userId,
+        email: res.email,
+        full_name: res.fullName,
+        role: res.role,
+      };
+      saveTokens(currentUser);
+
+      // Cập nhật AuthContext để Navbar và các component cập nhật ngay (OTP-008)
+      setUser(currentUser);
+
       navigate("/");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t("auth.register.errorOtp"));

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { io, Socket } from 'socket.io-client';
 import IncomingCallModal from "@/components/IncomingCallModal";
-import { getAccessToken } from "@/lib/auth";
 import { type IncomingCallPayload } from "@/lib/videoApi";
 import { useAuth } from "@/hooks/useAuth";
+import { API_BASE_URL } from "@/lib/api";
 
-const WS_URL = (import.meta.env.VITE_WS_URL as string) || "";
+const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_BASE_URL;
 
 /**
  * GlobalCallProvider — mounts once at app root level.
@@ -28,11 +28,8 @@ export default function GlobalCallProvider({ children }: { children: ReactNode }
       return;
     }
 
-    const token = getAccessToken();
-    if (!token) return;
-
     const socket = io(WS_URL, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket'],
     });
 

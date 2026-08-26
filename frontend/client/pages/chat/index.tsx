@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
 import Navbar from "@/components/Navbar";
 import { API_BASE_URL } from "@/lib/api";
-import { getAccessToken, getCurrentUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { useChatSocket } from "@/hooks/useChatSocket";
 import {
   createOrGetConversation,

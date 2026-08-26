@@ -34,6 +34,9 @@ public class Otp {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "attempt_count", nullable = false)
+    private Integer attemptCount = 0;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

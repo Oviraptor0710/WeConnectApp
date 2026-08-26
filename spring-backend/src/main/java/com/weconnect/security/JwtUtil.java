@@ -1,5 +1,6 @@
 package com.weconnect.security;
 
+import com.weconnect.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -9,74 +10,80 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.function.Function;
+import java.util.Map;
 
 @Component
 public class JwtUtil {
 
-    // Lấy config từ file application.yml
-    @Value("${app.jwt.secret}")
-    private String secretKey;
+    public static final String ACCESS_TOKEN_TYPE = "access";
 
-    @Value("${app.jwt.access-expiration-ms}")
-    private long accessExpirationMs;
+    private final SecretKey signingKey;
+    private final String issuer;
+    private final long accessExpirationMs;
 
-    @Value("${app.jwt.refresh-expiration-ms}")
-    private long refreshExpirationMs;
-
-    // Biến chuỗi String bí mật thành Chìa Khóa Mật Mã (SecretKey)
-    private SecretKey getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+    public JwtUtil(
+            @Value("${app.jwt.secret}") String secretKey,
+            @Value("${app.jwt.issuer:weconnect-auth}") String issuer,
+            @Value("${app.jwt.access-expiration-ms}") long accessExpirationMs
+    ) {
+        this.signingKey = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        this.issuer = issuer;
+        this.accessExpirationMs = accessExpirationMs;
     }
 
-    // 1. Tạo Access Token (Vé VIP ngắn hạn - 15 phút)
-    public String generateAccessToken(String email) {
-        return buildToken(email, accessExpirationMs);
+    /**
+     * Contract dùng chung trong giai đoạn Strangler:
+     * sub=user_id, type=access. FastAPI và WebSocket cũ đều hiểu contract này.
+     */
+    public String generateAccessToken(User user) {
+        return buildToken(
+                user.getUserId().toString(),
+                Map.of(
+                        "type", ACCESS_TOKEN_TYPE,
+                        "email", user.getEmail(),
+                        "role", user.getRole()
+                ),
+                accessExpirationMs
+        );
     }
 
-    // 2. Tạo Refresh Token (Vé VIP dài hạn để đổi vé mới - 30 ngày)
-    public String generateRefreshToken(String email) {
-        return buildToken(email, refreshExpirationMs);
+    public Long extractUserId(String token) {
+        return Long.valueOf(parseClaims(token).getSubject());
     }
 
-    // Hàm lõi: Chế tạo vé
-    private String buildToken(String email, long expirationMs) {
+    public String extractTokenType(String token) {
+        return parseClaims(token).get("type", String.class);
+    }
+
+    public boolean isAccessTokenValid(String token, Long expectedUserId) {
+        Claims claims = parseClaims(token);
+        return ACCESS_TOKEN_TYPE.equals(claims.get("type", String.class))
+                && expectedUserId.toString().equals(claims.getSubject())
+                && claims.getExpiration().after(new Date());
+    }
+
+    public long getAccessExpirationMs() {
+        return accessExpirationMs;
+    }
+
+    private String buildToken(String subject, Map<String, Object> claims, long expirationMs) {
+        long now = System.currentTimeMillis();
         return Jwts.builder()
-                .subject(email) // Đưa tên người dùng (email) lên vé
-                .issuedAt(new Date(System.currentTimeMillis())) // Thời gian in vé
-                .expiration(new Date(System.currentTimeMillis() + expirationMs)) // Thời gian hết hạn
-                .signWith(getSigningKey()) // Đóng dấu mộc đỏ
-                .compact(); // Nén lại thành chuỗi String ngắn gọn
+                .claims(claims)
+                .subject(subject)
+                .issuer(issuer)
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + expirationMs))
+                .signWith(signingKey)
+                .compact();
     }
 
-    // 3. Đọc tên người dùng (email) từ trên vé
-    public String extractEmail(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    // 4. Kiểm tra vé còn hạn không?
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
-
-    // 5. Vệ sĩ soát vé: Vé có phải của người này không, và còn hạn không?
-    public boolean isTokenValid(String token, String userEmail) {
-        final String email = extractEmail(token);
-        return (email.equals(userEmail)) && !isTokenExpired(token);
-    }
-
-    // Hàm lõi: Giải mã chiếc vé bằng Chìa Khóa Mật Mã
-    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = Jwts.parser()
-                .verifyWith(getSigningKey()) // Kiểm tra dấu mộc đỏ
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(signingKey)
+                .requireIssuer(issuer)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload(); // Trích xuất thông tin
-        return claimsResolver.apply(claims);
+                .getPayload();
     }
 }

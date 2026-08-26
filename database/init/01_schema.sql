@@ -228,8 +228,22 @@ CREATE TABLE OTPS (
     purpose    VARCHAR(50)  NOT NULL,  -- REGISTER | FORGOT_PASSWORD
     expire_at  TIMESTAMP    NOT NULL,
     used       BOOLEAN      DEFAULT FALSE,
+    attempt_count INT       NOT NULL DEFAULT 0,
     created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ── 15b. AUTH_SESSIONS ──────────────────────────────────────
+CREATE TABLE AUTH_SESSIONS (
+    session_id BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    user_id    BIGINT       NOT NULL,
+    token_hash CHAR(64)     NOT NULL UNIQUE,
+    token_type VARCHAR(30)  NOT NULL,
+    expires_at TIMESTAMP    NOT NULL,
+    revoked_at TIMESTAMP    NULL,
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES USERS(user_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_auth_sessions_user_active ON AUTH_SESSIONS(user_id, revoked_at);
 
 -- ── 16. GAMES ─────────────────────────────────────────────────
 CREATE TABLE GAMES (

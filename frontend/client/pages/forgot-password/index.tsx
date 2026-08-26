@@ -21,7 +21,7 @@ export default function Index() {
       try {
         await apiFetch("/api/v1/auth/forgot-password", {
           method: "POST",
-          body: JSON.stringify({ identifier: email }),
+          body: JSON.stringify({ email: email.trim() }),
         }, true);
         setSuccessMsg(t("auth.forgotPassword.successMsg"));
         setStep("otp");
@@ -32,15 +32,19 @@ export default function Index() {
       }
     } else {
       try {
-        const res = await apiFetch<{ data: { reset_token: string } }>(
+        const res = await apiFetch<{ resetToken: string; expiresIn: number }>(
           "/api/v1/auth/otp/verify",
           {
             method: "POST",
-            body: JSON.stringify({ identifier: email, code: otp, purpose: "FORGOT_PASSWORD" }),
+            body: JSON.stringify({
+              email: email.trim(),
+              otpCode: otp,
+              purpose: "FORGOT_PASSWORD",
+            }),
           },
           true
         );
-        sessionStorage.setItem("reset_token", res.data.reset_token);
+        sessionStorage.setItem("reset_token", res.resetToken);
         navigate("/reset-password");
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : t("auth.register.errorOtp"));

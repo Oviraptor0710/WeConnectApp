@@ -28,7 +28,7 @@ public class GameAnswer {
     @Column(name = "question_index", nullable = false)
     private Integer questionIndex;
 
-    @Column(name = "selected_index", nullable = false)
+    @Column(name = "selected_index", nullable = false, columnDefinition = "TINYINT")
     private Integer selectedIndex; // TINYINT
 
     @Column(name = "is_correct", nullable = false)

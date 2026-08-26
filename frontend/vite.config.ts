@@ -15,19 +15,19 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/api/v1": {
-        target: "http://127.0.0.1:8001",
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
       "/uploads": {
-        target: "http://127.0.0.1:8001",
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
       "/static": {
-        target: "http://127.0.0.1:8001",
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
       "/socket.io": {
-        target: "http://127.0.0.1:3000",
+        target: "http://127.0.0.1:8080",
         changeOrigin: true,
         ws: true,
       },

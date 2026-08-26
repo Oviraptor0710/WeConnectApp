@@ -7,8 +7,6 @@ interface Props {
   onClose: (reason?: "REJECTED" | "TIMEOUT") => void;
 }
 
-const RING_TIMEOUT_MS = 15_000; // auto-reject after 15 s
-
 export default function IncomingCallModal({ payload, onClose }: Props) {
   const navigate = useNavigate();
   const [secondsLeft, setSecondsLeft] = useState(15);

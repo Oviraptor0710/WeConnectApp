@@ -3,7 +3,7 @@ app:
   cookie:
     secure: true               # Bật Secure bắt buộc phải dùng HTTPS mới gửi cookie
     same-site: None            # Dùng None nếu Frontend và Backend khác domain (Ngrok). Nhớ đi kèm secure: true
-    domain: ${APP_DOMAIN:""}   # Đọc domain từ biến môi trường (ví dụ: ngrok.io)
+    domain: ${APP_DOMAIN:}     # Để trống tạo host-only cookie; chỉ đặt khi thật sự cần chia sẻ giữa subdomain
 
 spring:
   jpa:

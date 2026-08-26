@@ -1,93 +1,102 @@
 export const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || "";
 
-async function getToken(): Promise<string | null> {
-  return localStorage.getItem("access_token");
-}
+let refreshPromise: Promise<boolean> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return false;
+async function tryRefreshSession(): Promise<boolean> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  })();
+
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    localStorage.setItem("access_token", data.data.access_token);
-    return true;
-  } catch {
-    return false;
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
   }
 }
 
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
-  skipAuth = false
+  skipAuth = false,
+  redirectOnUnauthorized = true
 ): Promise<T> {
-  const token = skipAuth ? null : await getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // Đảm bảo trình duyệt luôn đính kèm HttpOnly Cookie vào request
+  const fetchOptions: RequestInit = {
+    ...options,
+    headers,
+    credentials: "include", // Cực kỳ quan trọng để gửi Cookie
+  };
 
   console.log(`[apiFetch] Calling: ${API_BASE_URL}${path}`, { method: options.method || "GET" });
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  let res = await fetch(`${API_BASE_URL}${path}`, fetchOptions);
   console.log(`[apiFetch] Response received for ${path}: ${res.status}`);
 
   if (res.status === 401 && !skipAuth) {
-    const refreshed = await tryRefresh();
+    const refreshed = await tryRefreshSession();
     if (refreshed) {
-      const newToken = localStorage.getItem("access_token");
-      headers["Authorization"] = `Bearer ${newToken}`;
-      const retryRes = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-      if (!retryRes.ok) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("current_user");
-        window.location.href = "/login";
-        throw new Error("Session expired");
-      }
-      if (retryRes.status === 204) return null as T;
-      return retryRes.json();
-    } else {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      res = await fetch(`${API_BASE_URL}${path}`, fetchOptions);
+    }
+    if (!refreshed || res.status === 401) {
       localStorage.removeItem("current_user");
-      window.location.href = "/login";
-      throw new Error("Unauthorized");
+      if (redirectOnUnauthorized && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      throw new Error("Phiên đăng nhập đã hết hạn");
     }
   }
 
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
+    const contentType = res.headers.get("Content-Type") || "";
+    const errData = contentType.includes("application/json")
+      ? await res.json().catch(() => ({}))
+      : await res.text().catch(() => "");
     console.error(`[apiFetch] Error for ${path}:`, errData);
-    let errMsg = `Error ${res.status}`;
-    if (errData && errData.detail) {
-      if (typeof errData.detail === "string") {
-        errMsg = errData.detail;
-      } else if (Array.isArray(errData.detail)) {
-        errMsg = errData.detail
-          .map((err: any) => {
-            let msg = err.msg || JSON.stringify(err);
-            if (msg.startsWith("Value error, ")) {
-              msg = msg.substring("Value error, ".length);
-            }
-            return msg;
-          })
-          .join(", ");
-      } else {
-        errMsg = JSON.stringify(errData.detail);
-      }
+
+    // Tương thích đồng thời Spring ({message}) và FastAPI ({detail}).
+    let errMsg = `Lỗi hệ thống (${res.status})`;
+    if (errData && errData.message) {
+      errMsg = errData.message;
+    } else if (errData && typeof errData.detail === "string") {
+      errMsg = errData.detail;
+    } else if (errData && Array.isArray(errData.detail)) {
+      errMsg = errData.detail.map((item: { msg?: string }) => item.msg || "Dữ liệu không hợp lệ").join(", ");
+    } else if (typeof errData === "string") {
+      errMsg = errData;
     }
+
     throw new Error(errMsg);
   }
 
   if (res.status === 204) return null as T;
-  return res.json();
+
+  // OTP-002: Kiểm tra Content-Type trước khi parse
+  const contentType = res.headers.get("Content-Type") || "";
+  const text = await res.text();
+  if (!text) return null as T;
+
+  if (contentType.includes("application/json")) {
+    return JSON.parse(text) as T;
+  }
+
+  // Response dạng plain text (VD: "Đăng ký thành công!") → bọc vào object
+  return { message: text } as T;
 }

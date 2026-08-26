@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { getAccessToken } from '@/lib/auth';
 import type { ChatMessage, ChatConversation } from '@/lib/chatApi';
+import { API_BASE_URL } from '@/lib/api';
 
-const WS_URL = (import.meta.env.VITE_WS_URL as string) || "";
+const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_BASE_URL;
 
 interface UseChatSocketProps {
   currentUserId: number | null;
@@ -49,11 +49,8 @@ export function useChatSocket({
   useEffect(() => {
     if (!currentUserId) return;
 
-    const token = getAccessToken();
-    if (!token) return;
-
     const socket = io(WS_URL, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket'],
     });
 

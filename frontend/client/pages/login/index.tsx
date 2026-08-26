@@ -45,16 +45,16 @@ export default function Index() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, isLoggedIn } = useAuth();
+  const { login, isLoggedIn, isAuthLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const from = location.state?.from?.pathname || "/";
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (!isAuthLoading && isLoggedIn) {
       navigate("/", { replace: true });
     }
-  }, [isLoggedIn, navigate]);
+  }, [isAuthLoading, isLoggedIn, navigate]);
 
   const handleLogin = async () => {
     setError("");

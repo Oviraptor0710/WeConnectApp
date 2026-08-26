@@ -32,13 +32,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // 1. Tìm vé (Token)
-        String jwt = null;
+        String jwt = extractBearerToken(request);
 
-        // Tìm duy nhất trong HttpOnly Cookie (Bảo mật tuyệt đối cho Web, chống XSS)
+        // Web client dùng HttpOnly cookie. Bearer vẫn được hỗ trợ cho service/client cũ.
         if (request.getCookies() != null) {
             for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
-                if ("accessToken".equals(cookie.getName())) {
+                if (jwt == null && "accessToken".equals(cookie.getName())) {
                     jwt = cookie.getValue();
                     break;
                 }
@@ -51,21 +50,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        final String userEmail;
-
         try {
-            // Lấy email từ vé
-            userEmail = jwtUtil.extractEmail(jwt);
-
-            // Nếu có email và vị khách này chưa được ai "đóng mộc" (chưa được xác thực)
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                // 3. Tra sổ Database xem có người này không
-                User user = userRepository.findByEmail(userEmail).orElse(null);
-
-                // 4. Nếu có người này và vé còn hạn
-                if (user != null && jwtUtil.isTokenValid(jwt, user.getEmail())) {
-                    
+            Long userId = jwtUtil.extractUserId(jwt);
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                User user = userRepository.findById(userId).orElse(null);
+                if (user != null && jwtUtil.isAccessTokenValid(jwt, user.getUserId())) {
                     // Tạo ra thẻ tên (UsernamePasswordAuthenticationToken)
                     CustomUserDetails userDetails = new CustomUserDetails(user);
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -79,12 +68,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
-        } catch (Exception e) {
-            // Nếu xé vé bị lỗi (Vé giả, mộc đỏ giả, vé hết hạn...) thì im lặng cho đi qua.
-            // Spring Security sẽ tự động chặn họ lại khi họ định bước vào Khu vực VIP.
+        } catch (Exception ignored) {
+            // Endpoint private sẽ được Spring Security trả 401 ở bước authorization.
         }
 
         // Cuối cùng, mở cửa cho đi tiếp vào bên trong (Controller)
         filterChain.doFilter(request, response);
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader("Authorization");
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            String token = authorization.substring(7).trim();
+            return token.isEmpty() ? null : token;
+        }
+        return null;
     }
 }

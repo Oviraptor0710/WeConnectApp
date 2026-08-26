@@ -74,12 +74,11 @@ function CallControls({
     // ── Socket.io: listen for "video:call-rejected" on own channel ──
     async function setupRejectionListener() {
       const user = getCurrentUser();
-      const token = localStorage.getItem("access_token");
-      if (!user || !token) return;
+      if (!user) return;
       try {
-        const WS_URL = (import.meta.env.VITE_WS_URL as string) || "";
+        const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_BASE_URL;
         socket = io(WS_URL, {
-          auth: { token },
+          withCredentials: true,
           transports: ['websocket'],
         });
         

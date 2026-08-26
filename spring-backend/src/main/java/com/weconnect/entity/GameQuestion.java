@@ -30,11 +30,12 @@ public class GameQuestion {
     @Column(columnDefinition = "JSON", nullable = false)
     private String options; // Chuỗi JSON chứa mảng các lựa chọn (A, B, C, D)
 
-    @Column(name = "correct_index", nullable = false)
+    @Column(name = "correct_index", nullable = false, columnDefinition = "TINYINT")
     private Integer correctIndex; // TINYINT trong DB có thể map với Integer hoặc Byte
 
     @Column(length = 255)
     private String hint;
 
+    @Column(columnDefinition = "TINYINT")
     private Integer difficulty = 1;
 }

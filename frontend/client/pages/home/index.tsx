@@ -76,6 +76,8 @@ const NAV_LINKS = [
   },
 ];
 
+void NAV_LINKS;
+
 const AddFriendIcon = () => (
   <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
     <path
@@ -142,7 +144,7 @@ function EventCard({
   location,
   locationIcon = "map",
   registeredCount,
-  capacity,
+  capacity: _capacity,
   isRegistered,
   isFull,
   onJoinToggle,
