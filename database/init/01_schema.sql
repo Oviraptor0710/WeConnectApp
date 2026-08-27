@@ -57,7 +57,7 @@ CREATE TABLE FRIEND_REQUESTS (
     request_id   BIGINT      AUTO_INCREMENT PRIMARY KEY,
     sender_id    BIGINT      NOT NULL,
     receiver_id  BIGINT      NOT NULL,
-    status       VARCHAR(20) DEFAULT 'PENDING',   -- PENDING | ACCEPTED | REJECTED | CANCELLED
+    status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',   -- PENDING | ACCEPTED | REJECTED | CANCELLED
     created_at   TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     responded_at TIMESTAMP   NULL,
     FOREIGN KEY (sender_id)   REFERENCES USERS(user_id) ON DELETE CASCADE,
@@ -295,6 +295,7 @@ CREATE INDEX idx_users_japanese_level ON USERS(japanese_level);
 CREATE INDEX idx_messages_conv_time   ON MESSAGES(conversation_id, created_at DESC);
 
 CREATE INDEX idx_friend_req_receiver  ON FRIEND_REQUESTS(receiver_id, status);
+CREATE INDEX idx_friend_req_sender    ON FRIEND_REQUESTS(sender_id, status);
 CREATE INDEX idx_friendships_user1    ON FRIENDSHIPS(user1_id);
 CREATE INDEX idx_friendships_user2    ON FRIENDSHIPS(user2_id);
 

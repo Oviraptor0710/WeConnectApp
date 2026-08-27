@@ -1,4 +1,4 @@
-package com.weconnect.dto.request;
+package com.weconnect.dto.auth.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

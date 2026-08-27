@@ -33,6 +33,18 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(message, HttpStatus.CONFLICT);
     }
 
+    public static BusinessException notFound(String message) {
+        return new BusinessException(message, HttpStatus.NOT_FOUND);
+    }
+
+    public static BusinessException unprocessableEntity(String message) {
+        return new BusinessException(message, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    public static BusinessException payloadTooLarge(String message) {
+        return new BusinessException(message, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
     // --- 429 Too Many Requests: Spam OTP ---
     public static BusinessException tooManyRequests(String message) {
         return new BusinessException(message, HttpStatus.TOO_MANY_REQUESTS);

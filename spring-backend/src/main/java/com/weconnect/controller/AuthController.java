@@ -1,9 +1,14 @@
 package com.weconnect.controller;
 
-import com.weconnect.dto.request.*;
-import com.weconnect.dto.response.AuthResponse;
-import com.weconnect.dto.response.MessageResponse;
-import com.weconnect.dto.response.ResetTokenResponse;
+import com.weconnect.dto.auth.request.ForgotPasswordRequest;
+import com.weconnect.dto.auth.request.LoginRequest;
+import com.weconnect.dto.auth.request.RegisterRequest;
+import com.weconnect.dto.auth.request.ResetPasswordRequest;
+import com.weconnect.dto.auth.request.SendOtpRequest;
+import com.weconnect.dto.auth.request.VerifyOtpRequest;
+import com.weconnect.dto.auth.response.AuthResponse;
+import com.weconnect.dto.auth.response.MessageResponse;
+import com.weconnect.dto.auth.response.ResetTokenResponse;
 import com.weconnect.entity.OtpPurpose;
 import com.weconnect.entity.User;
 import com.weconnect.security.CustomUserDetails;

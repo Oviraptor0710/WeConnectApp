@@ -1,4 +1,4 @@
-package com.weconnect.dto.response;
+package com.weconnect.dto.auth.response;
 
 import lombok.Builder;
 import lombok.Data;

@@ -1,7 +1,7 @@
 package com.weconnect.service;
 
-import com.weconnect.dto.request.LoginRequest;
-import com.weconnect.dto.request.RegisterRequest;
+import com.weconnect.dto.auth.request.LoginRequest;
+import com.weconnect.dto.auth.request.RegisterRequest;
 import com.weconnect.entity.Otp;
 import com.weconnect.entity.OtpPurpose;
 import com.weconnect.entity.User;

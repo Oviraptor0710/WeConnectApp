@@ -1,4 +1,4 @@
-package com.weconnect.dto.request;
+package com.weconnect.dto.auth.request;
 
 import com.weconnect.entity.OtpPurpose;
 import jakarta.validation.constraints.Email;

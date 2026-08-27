@@ -4,9 +4,9 @@ WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline
 
-# Copy source code và build file .jar
+# Copy source code, chạy test rồi build file .jar
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn clean package
 
 # Stage 2: Chỉ lấy file .jar để chạy (giúp image nhẹ hơn)
 FROM eclipse-temurin:21-jre
