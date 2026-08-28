@@ -99,11 +99,14 @@ export function translateMessage(messageId: number, targetLanguage: "VI" | "JA" 
 
 
 
-export function uploadChatFile(file: File) {
+export function sendChatAttachment(conversationId: number, file: File) {
   const formData = new FormData();
   formData.append("file", file);
-  return apiFetch<{ data: { url: string } }>("/api/v1/upload", {
+  return apiFetch<{ data: ChatMessage }>(
+    `/api/v1/conversations/${conversationId}/attachments`,
+    {
     method: "POST",
     body: formData,
-  });
+    }
+  );
 }

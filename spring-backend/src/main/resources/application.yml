@@ -4,8 +4,8 @@ server:
 spring:
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 11MB
+      max-file-size: 50MB
+      max-request-size: 51MB
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev} # Mặc định là dev nếu không truyền biến môi trường
   datasource:
@@ -52,3 +52,14 @@ app:
   brevo:
     api-key: ${BREVO_API_KEY:}
     from-email: ${BREVO_FROM_EMAIL:}
+  ws:
+    internal-url: ${WS_SERVER_INTERNAL_URL:http://ws_server:3000}
+    # Có thể đặt key riêng ở production; dev tạm fallback về SECRET_KEY dùng chung.
+    internal-secret: ${WS_INTERNAL_SECRET:${app.jwt.secret}}
+  livekit:
+    url: ${LIVEKIT_URL:}
+    api-key: ${LIVEKIT_API_KEY:}
+    api-secret: ${LIVEKIT_API_SECRET:}
+    token-ttl-ms: 600000
+  call:
+    ring-timeout-seconds: 35

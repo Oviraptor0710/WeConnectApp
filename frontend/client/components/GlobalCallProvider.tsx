@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { io, Socket } from 'socket.io-client';
 import IncomingCallModal from "@/components/IncomingCallModal";
-import { type IncomingCallPayload } from "@/lib/videoApi";
+import { getActiveIncomingCall, type IncomingCallPayload } from "@/lib/videoApi";
 import { useAuth } from "@/hooks/useAuth";
 import { API_BASE_URL } from "@/lib/api";
 
@@ -37,6 +37,19 @@ export default function GlobalCallProvider({ children }: { children: ReactNode }
       setIncomingCall(payload);
     });
 
+    const dismissMatchingCall = (payload: { call_id: number }) => {
+      setIncomingCall((current) => current?.call_id === payload.call_id ? null : current);
+    };
+    socket.on("video:call-ended", dismissMatchingCall);
+
+    // Socket events can be missed while the browser reconnects. Spring remains
+    // the source of truth, so recover any still-ringing call from the database.
+    getActiveIncomingCall()
+      .then((response) => {
+        if (response.data) setIncomingCall(response.data);
+      })
+      .catch(() => { /* the next socket event can still deliver the call */ });
+
     socketRef.current = socket;
 
     return () => {
@@ -52,6 +65,7 @@ export default function GlobalCallProvider({ children }: { children: ReactNode }
       {children}
       {incomingCall && (
         <IncomingCallModal
+          key={incomingCall.call_id}
           payload={incomingCall}
           onClose={handleDismissCall}
         />

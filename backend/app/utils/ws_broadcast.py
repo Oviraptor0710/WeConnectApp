@@ -17,7 +17,14 @@ def trigger_event(channel: str, event: str, data: dict[str, Any]) -> bool:
         "data": data
     }
     try:
-        response = httpx.post(url, json=payload, timeout=2.0)
+        response = httpx.post(
+            url,
+            json=payload,
+            headers={
+                "X-Internal-Secret": settings.WS_INTERNAL_SECRET or settings.SECRET_KEY
+            },
+            timeout=2.0,
+        )
         response.raise_for_status()
         return True
     except Exception as e:

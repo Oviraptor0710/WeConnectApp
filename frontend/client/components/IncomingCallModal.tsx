@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { rejectCall, type IncomingCallPayload } from "@/lib/videoApi";
+import { acceptCall, rejectCall, timeoutCall, type IncomingCallPayload } from "@/lib/videoApi";
 
 interface Props {
   payload: IncomingCallPayload;
@@ -9,39 +9,49 @@ interface Props {
 
 export default function IncomingCallModal({ payload, onClose }: Props) {
   const navigate = useNavigate();
-  const [secondsLeft, setSecondsLeft] = useState(15);
+  const initialSeconds = Math.max(0, Math.ceil((new Date(payload.expires_at).getTime() - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const timerRef = useRef<number | null>(null);
-  // Guard: set to true the moment user accepts — prevents handleTimeout from
-  // firing a spurious rejection signal during the unmount race condition.
-  const acceptedRef = useRef(false);
+  // Prevent accept/reject/timeout from racing and sending multiple transitions.
+  const handledRef = useRef(false);
 
-  const handleTimeout = () => {
+  const handleTimeout = async () => {
     // Do NOT send rejection if user has already accepted
-    if (acceptedRef.current) return;
-    rejectCall(payload.caller_id, "TIMEOUT").catch(() => { });
+    if (handledRef.current) return;
+    handledRef.current = true;
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    await timeoutCall(payload.call_id).catch(() => { });
     onClose("TIMEOUT");
   };
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     // Mark as accepted FIRST and clear the interval immediately
     // to prevent handleTimeout from firing before the component unmounts
-    acceptedRef.current = true;
+    handledRef.current = true;
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    onClose();
-    const params = new URLSearchParams({
-      room: payload.room_name,
-      partner: payload.caller_name,
-      ...(payload.caller_avatar ? { avatar: payload.caller_avatar } : {}),
-    });
-    navigate(`/call?${params.toString()}`);
+    try {
+      await acceptCall(payload.call_id);
+      onClose();
+      navigate(`/call/${payload.call_id}`);
+    } catch (error) {
+      setIsSubmitting(false);
+      window.alert(error instanceof Error ? error.message : "Không thể chấp nhận cuộc gọi");
+      onClose();
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    handledRef.current = true;
     if (timerRef.current) window.clearInterval(timerRef.current);
-    rejectCall(payload.caller_id, "REJECTED").catch(() => { });
+    await rejectCall(payload.call_id).catch(() => { });
     onClose("REJECTED");
   };
 
@@ -91,10 +101,10 @@ export default function IncomingCallModal({ payload, onClose }: Props) {
             }}
           />
           {/* Avatar */}
-          {payload.caller_avatar ? (
+          {payload.caller.avatar_url ? (
             <img
-              src={payload.caller_avatar}
-              alt={payload.caller_name}
+              src={payload.caller.avatar_url}
+              alt={payload.caller.full_name}
               className="w-24 h-24 rounded-full object-cover relative z-10"
               style={{ border: "3px solid rgba(78,222,163,0.50)" }}
             />
@@ -107,7 +117,7 @@ export default function IncomingCallModal({ payload, onClose }: Props) {
               }}
             >
               <span className="text-white font-bold text-4xl">
-                {payload.caller_name.charAt(0).toUpperCase()}
+                {payload.caller.full_name.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
@@ -120,7 +130,7 @@ export default function IncomingCallModal({ payload, onClose }: Props) {
             className="text-white font-bold"
             style={{ fontFamily: "Inter, sans-serif", fontSize: 22 }}
           >
-            {payload.caller_name}
+            {payload.caller.full_name}
           </h2>
           <p className="text-white/40 text-xs">Tự động từ chối sau {secondsLeft}s</p>
         </div>
@@ -131,6 +141,7 @@ export default function IncomingCallModal({ payload, onClose }: Props) {
           <button
             id="btn-reject-call"
             onClick={handleReject}
+            disabled={isSubmitting}
             className="flex flex-col items-center gap-2 transition-transform hover:scale-110 active:scale-95"
             title="Từ chối"
           >
@@ -153,6 +164,7 @@ export default function IncomingCallModal({ payload, onClose }: Props) {
           <button
             id="btn-accept-call"
             onClick={handleAccept}
+            disabled={isSubmitting}
             className="flex flex-col items-center gap-2 transition-transform hover:scale-110 active:scale-95"
             title="Chấp nhận"
           >

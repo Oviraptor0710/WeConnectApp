@@ -1,5 +1,6 @@
 package com.weconnect.entity;
 
+import com.weconnect.domain.chat.MessageType;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,13 +29,14 @@ public class Message {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
-    @Column(name = "message_type", length = 20)
-    private String messageType = "TEXT"; // TEXT | IMAGE | FILE
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", length = 20, nullable = false)
+    private MessageType messageType = MessageType.TEXT;
 
     @Column(name = "translated_content", columnDefinition = "TEXT")
     private String translatedContent;
 
-    @Column(name = "is_read")
+    @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 
     @Column(name = "created_at", updatable = false)
@@ -42,6 +44,32 @@ public class Message {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    public static Message create(
+            Conversation conversation,
+            User sender,
+            String content,
+            MessageType type,
+            LocalDateTime createdAt
+    ) {
+        if (!conversation.hasParticipant(sender.getUserId())) {
+            throw new IllegalArgumentException("Người gửi không thuộc hội thoại");
+        }
+        Message message = new Message();
+        message.setConversation(conversation);
+        message.setSender(sender);
+        message.setContent(content);
+        message.setMessageType(type);
+        message.setCreatedAt(createdAt);
+        message.setIsRead(false);
+        return message;
+    }
+
+    public void markRead() {
+        this.isRead = true;
     }
 }

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
 
     WS_SERVER_INTERNAL_URL: str = "http://ws_server:3000"
+    WS_INTERNAL_SECRET: str | None = None
 
 
     LIVEKIT_URL: str | None = None

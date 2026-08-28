@@ -11,15 +11,15 @@ import {
   listMessages,
   markConversationRead,
   sendMessage as sendChatMessage,
+  sendChatAttachment,
   sendTypingStatus,
   translateMessage,
-  uploadChatFile,
   type ChatConversation,
   type ChatMessage as ApiChatMessage,
 } from "@/lib/chatApi";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { sendCallInvite } from "@/lib/videoApi";
+import { createVideoCall } from "@/lib/videoApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1144,6 +1144,7 @@ function ChatWindow({
   translatingIds,
   currentUserId,
   onSend,
+  onSendAttachment,
   onTyping,
   onTranslate,
   onBack,
@@ -1157,6 +1158,7 @@ function ChatWindow({
   translatingIds: Set<number>;
   currentUserId: number | null;
   onSend: (content: string, type?: string) => Promise<void>;
+  onSendAttachment: (file: File) => Promise<void>;
   onTyping: (isTyping: boolean) => void;
   onTranslate: (messageId: number) => Promise<void>;
   onBack?: () => void;
@@ -1202,26 +1204,12 @@ function ChatWindow({
 
   const handleStartCall = async () => {
     if (!conv || currentUserId === null) return;
-    const minId = Math.min(currentUserId, conv.participantId);
-    const maxId = Math.max(currentUserId, conv.participantId);
-    const roomName = `room_${minId}_${maxId}`;
-
-    // Notify callee via Pusher before entering the room
-    const currentUser = getCurrentUser();
-    sendCallInvite({
-      calleeId: conv.participantId,
-      roomName,
-      callerName: currentUser?.full_name ?? "Người dùng",
-      callerAvatar: null, // Backend self-populates from current_user.avatar_url
-    }).catch(() => {}); // fire-and-forget — don't block navigation on failure
-
-    const params = new URLSearchParams({
-      room: roomName,
-      partner: conv.name,
-      partner_id: conv.participantId.toString(),
-      ...(conv.avatar ? { avatar: conv.avatar } : {}),
-    });
-    navigate(`/call?${params.toString()}`);
+    try {
+      const response = await createVideoCall(conv.participantId);
+      navigate(`/call/${response.data.call_id}`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Không thể bắt đầu cuộc gọi");
+    }
   };
 
   useEffect(() => {
@@ -1267,8 +1255,7 @@ function ChatWindow({
 
     setIsUploadingFile(true);
     try {
-      const response = await uploadChatFile(file);
-      await onSend(response.data.url, "FILE");
+      await onSendAttachment(file);
     } catch (error) {
       console.error("Upload file failed:", error);
     } finally {
@@ -1618,26 +1605,30 @@ export default function Index() {
 
   useChatSocket({
     currentUserId,
-    activeConversationId: activeConv?.conversationId,
     onNewMessage: (payload) => {
-      const nextMessage = toMessage(payload, currentUserId!);
-      setMessages((items) =>
-        items.some((message) => message.messageId === nextMessage.messageId)
-          ? items
-          : [...items, nextMessage]
-      );
+      if (payload.conversation_id === activeConv?.conversationId) {
+        const nextMessage = toMessage(payload, currentUserId!);
+        setMessages((items) =>
+          items.some((message) => message.messageId === nextMessage.messageId)
+            ? items
+            : [...items, nextMessage]
+        );
+      }
       updateConversationFromMessage(payload);
 
-      if (payload.sender_id !== currentUserId) {
+      if (
+        payload.conversation_id === activeConv?.conversationId &&
+        payload.sender_id !== currentUserId
+      ) {
         markConversationRead(payload.conversation_id, payload.message_id).catch(() => {});
       }
     },
     onTyping: (payload) => {
-      if (payload.user_id === currentUserId) return;
+      if (payload.conversation_id !== activeConv?.conversationId || payload.user_id === currentUserId) return;
       setTypingUserId(payload.is_typing ? payload.user_id : null);
     },
     onRead: (payload) => {
-      if (payload.user_id === currentUserId) return;
+      if (payload.conversation_id !== activeConv?.conversationId || payload.user_id === currentUserId) return;
       setMessages((items) =>
         items.map((message) =>
           message.from === "me" &&
@@ -1695,6 +1686,19 @@ export default function Index() {
     }
   };
 
+  const handleSendAttachment = async (file: File) => {
+    if (!activeConv) return;
+
+    const response = await sendChatAttachment(activeConv.conversationId, file);
+    const sentMessage = toMessage(response.data, currentUserId);
+    setMessages((items) =>
+      items.some((message) => message.messageId === sentMessage.messageId)
+        ? items
+        : [...items, sentMessage]
+    );
+    updateConversationFromMessage(response.data);
+  };
+
   const handleTyping = (isTyping: boolean) => {
     if (!activeConv || lastTypingStateRef.current === isTyping) return;
     lastTypingStateRef.current = isTyping;
@@ -1743,6 +1747,7 @@ export default function Index() {
           translatingIds={translatingIds}
           currentUserId={currentUserId}
           onSend={handleSend}
+          onSendAttachment={handleSendAttachment}
           onTyping={handleTyping}
           onTranslate={handleTranslate}
           onBack={() => setShowChatWindowOnMobile(false)}

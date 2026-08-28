@@ -32,10 +32,6 @@ def _pagination(page: int, page_size: int, total: int) -> dict:
     return {"page": page, "page_size": page_size, "total": total, "total_pages": total_pages}
 
 
-def _conversation_channel(conversation_id: int) -> str:
-    return f"private-conversation-{conversation_id}"
-
-
 def _user_channel(user_id: int) -> str:
     return f"private-user-{user_id}"
 
@@ -155,11 +151,9 @@ def _publish_conversation_update(db: Session, conversation: Conversation) -> Non
 
 
 def _publish_message_created(db: Session, conversation: Conversation, message: Message) -> None:
-    trigger_event(
-        _conversation_channel(conversation.conversation_id),
-        "chat:new",
-        jsonable_encoder(_message_to_dict(message)),
-    )
+    payload = jsonable_encoder(_message_to_dict(message))
+    for user_id in (conversation.user1_id, conversation.user2_id):
+        trigger_event(_user_channel(user_id), "chat:new", payload)
     _publish_conversation_update(db, conversation)
 
 
@@ -299,7 +293,7 @@ def send_typing_status(
 ):
     conversation = _get_conversation_for_user(db, conversation_id, current_user.user_id)
     trigger_event(
-        _conversation_channel(conversation.conversation_id),
+        _user_channel(_other_user_id(conversation, current_user.user_id)),
         "chat:typing",
         {
             "conversation_id": conversation.conversation_id,
@@ -342,7 +336,8 @@ def mark_conversation_read(
         "user_id": current_user.user_id,
         "last_read_message_id": body.last_read_message_id,
     }
-    trigger_event(_conversation_channel(conversation.conversation_id), "chat:read", payload)
+    for user_id in (conversation.user1_id, conversation.user2_id):
+        trigger_event(_user_channel(user_id), "chat:read", payload)
     _publish_conversation_update(db, conversation)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -402,7 +397,9 @@ def translate_message(
         "translated_content": message.translated_content,
         "target_language": body.target_language,
     }
-    trigger_event(_conversation_channel(message.conversation_id), "chat:translated", payload)
+    conversation = _get_conversation_for_user(db, message.conversation_id, current_user.user_id)
+    for user_id in (conversation.user1_id, conversation.user2_id):
+        trigger_event(_user_channel(user_id), "chat:translated", payload)
 
     return {
         "data": {

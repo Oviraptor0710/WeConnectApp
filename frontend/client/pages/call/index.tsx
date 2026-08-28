@@ -1,6 +1,6 @@
 import "@livekit/components-styles";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -9,14 +9,14 @@ import {
 } from "@livekit/components-react";
 import { RoomEvent, Track } from "livekit-client";
 import { io, Socket } from 'socket.io-client';
-import { getCurrentUser } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api";
-import { fetchVideoToken, rejectCall } from "@/lib/videoApi";
+import {
+  endVideoCall,
+  joinVideoCall,
+  timeoutCall,
+  type CallConnection,
+} from "@/lib/videoApi";
 import { useTranslation } from "react-i18next";
-
-// ─── Environment ─────────────────────────────────────────────────────────────
-
-const LIVEKIT_URL = (import.meta.env.VITE_LIVEKIT_URL as string) || "";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -27,12 +27,14 @@ type CallState = "connecting" | "connected" | "ended";
 function CallControls({
   partnerName,
   partnerAvatar,
-  partnerId,
+  callId,
+  expiresAt,
   onEnd,
 }: {
   partnerName: string;
   partnerAvatar: string | null;
-  partnerId: number;
+  callId: number;
+  expiresAt: string;
   onEnd: () => void;
 }) {
   const { t } = useTranslation();
@@ -67,52 +69,49 @@ function CallControls({
     room.on(RoomEvent.AudioPlaybackStatusChanged, handleAudioChanged);
     return () => { room.off(RoomEvent.AudioPlaybackStatusChanged, handleAudioChanged); };
   }, [room]);
-  // ── Listen for rejection + 35s no-answer timeout ─────────────────────────
+  // ── Listen for backend state changes + authoritative ring timeout ─────────
   useEffect(() => {
-    let socket: Socket | null = null;
+    const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_BASE_URL;
+    const socket: Socket = io(WS_URL, {
+      withCredentials: true,
+      transports: ['websocket'],
+    });
 
-    // ── Socket.io: listen for "video:call-rejected" on own channel ──
-    async function setupRejectionListener() {
-      const user = getCurrentUser();
-      if (!user) return;
-      try {
-        const WS_URL = (import.meta.env.VITE_WS_URL as string) || API_BASE_URL;
-        socket = io(WS_URL, {
-          withCredentials: true,
-          transports: ['websocket'],
-        });
-        
-        socket.on("video:call-rejected", (data: { reason: string }) => {
-          const msg =
-            data.reason === "TIMEOUT"
-              ? t("call.noAnswer")
-              : t("call.rejected");
-          setStatusMsg(msg);
-          setCallState("ended");
-          // Auto-navigate back after showing message
-          setTimeout(onEnd, 2500);
-        });
-      } catch {
-        // Optional — timeout still works
-      }
-    }
+    const finishFromBackend = (data: { call_id: number; reason?: string }) => {
+      if (data.call_id !== callId) return;
+      const message = data.reason === "REJECTED"
+        ? t("call.rejected")
+        : data.reason === "MISSED"
+          ? t("call.noAnswer")
+          : t("call.partnerEnded");
+      setStatusMsg(message);
+      setCallState("ended");
+      window.setTimeout(onEnd, 2500);
+    };
 
-    setupRejectionListener();
+    socket.on("video:call-rejected", finishFromBackend);
+    socket.on("video:call-ended", finishFromBackend);
 
-    // 35s hard timeout: if no remote participant joined, give up
+    // The expiry timestamp comes from Spring, so refreshing the page cannot
+    // restart the countdown or keep an unanswered call alive indefinitely.
+    const remainingMs = Math.max(0, new Date(expiresAt).getTime() - Date.now());
     const timeoutId = window.setTimeout(() => {
       if (room.remoteParticipants.size === 0) {
-        setStatusMsg(t("call.noAnswer"));
-        setCallState("ended");
-        setTimeout(onEnd, 2500);
+        timeoutCall(callId)
+          .catch(() => endVideoCall(callId))
+          .finally(() => {
+            setStatusMsg(t("call.noAnswer"));
+            setCallState("ended");
+            window.setTimeout(onEnd, 2500);
+          });
       }
-    }, 35_000);
+    }, remainingMs + 250);
 
     return () => {
       window.clearTimeout(timeoutId);
-      if (socket) socket.disconnect();
+      socket.disconnect();
     };
-  }, [room, onEnd]);
+  }, [room, onEnd, callId, expiresAt, t]);
 
   // ── Sync room state using LiveKit events (not dependency array) ──────────
   useEffect(() => {
@@ -125,6 +124,7 @@ function CallControls({
     // Remote participant left → notify remaining user and navigate back
     const handleParticipantDisconnected = () => {
       // Only act if we are still in the call (not already ending ourselves)
+      endVideoCall(callId).catch(() => {});
       setStatusMsg(t("call.partnerEnded"));
       setCallState("ended");
       setTimeout(onEnd, 2000);
@@ -159,7 +159,7 @@ function CallControls({
       room.off(RoomEvent.Connected, handleConnected);
       room.off(RoomEvent.Disconnected, handleDisconnected);
     };
-  }, [room, onEnd]);
+  }, [room, onEnd, callId, t]);
 
   // ── Attach local camera video ──────────────────────────────────────────────
   // Use `cameraTrack` from useLocalParticipant (reactive — updates when track publishes)
@@ -244,13 +244,10 @@ function CallControls({
   }, [localParticipant, videoEnabled]);
 
   const handleEndCall = useCallback(async () => {
-    // If still waiting (connecting), notify the other side we cancelled
-    if (callState === "connecting") {
-      rejectCall(partnerId, "REJECTED").catch(() => {});
-    }
+    await endVideoCall(callId).catch(() => {});
     await room.disconnect();
     onEnd();
-  }, [room, onEnd, callState, partnerId]);
+  }, [room, onEnd, callId]);
 
   // ── Status indicator ──────────────────────────────────────────────────────
   const statusDot =
@@ -579,33 +576,30 @@ function ErrorScreen({ message, onBack }: { message: string; onBack: () => void 
 
 export default function CallPage() {
   const { t } = useTranslation();
-  const [searchParams] = useSearchParams();
+  const { callId: callIdParam } = useParams<{ callId: string }>();
   const navigate = useNavigate();
 
-  const roomName = searchParams.get("room") ?? "";
-  const partnerName = searchParams.get("partner") ?? "Người dùng";
-  const partnerAvatar = searchParams.get("avatar") ?? null;
-  const partnerId = Number(searchParams.get("partner_id") ?? "0");
-
-  const [token, setToken] = useState<string | null>(null);
+  const callId = Number(callIdParam);
+  const [connection, setConnection] = useState<CallConnection | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Guard: no room → back to chat
+  // Guard: only an integer call_id is accepted. Room names never come from the URL.
   useEffect(() => {
-    if (!roomName) navigate("/chat", { replace: true });
-  }, [roomName, navigate]);
+    if (!Number.isSafeInteger(callId) || callId <= 0) navigate("/chat", { replace: true });
+  }, [callId, navigate]);
 
-  // Fetch LiveKit token
+  // Spring verifies that this user participates in the call and only then
+  // returns a short-lived, room-scoped LiveKit token.
   useEffect(() => {
-    if (!roomName) return;
+    if (!Number.isSafeInteger(callId) || callId <= 0) return;
     let cancelled = false;
-    fetchVideoToken(roomName)
-      .then((t) => { if (!cancelled) setToken(t); })
+    joinVideoCall(callId)
+      .then((response) => { if (!cancelled) setConnection(response.data); })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : t("call.connectionError"));
       });
     return () => { cancelled = true; };
-  }, [roomName]);
+  }, [callId, t]);
 
   const handleCallEnd = useCallback(() => navigate("/chat"), [navigate]);
   const handleRoomError = useCallback((err: Error) => {
@@ -620,8 +614,8 @@ export default function CallPage() {
 
   if (error) return <ErrorScreen message={error} onBack={handleCallEnd} />;
 
-  // Loading spinner while waiting for token
-  if (!token) {
+  // Loading spinner while waiting for the authorized connection contract
+  if (!connection) {
     return (
       <div
         className="w-full h-screen flex flex-col items-center justify-center gap-4"
@@ -639,17 +633,18 @@ export default function CallPage() {
     <LiveKitRoom
       video={true}
       audio={true}
-      token={token}
-      serverUrl={LIVEKIT_URL}
+      token={connection.participant_token}
+      serverUrl={connection.server_url}
       data-lk-theme="default"
       onError={handleRoomError}
       options={{ adaptiveStream: true, dynacast: true }}
       style={{ height: "100dvh" }}
     >
       <CallControls
-        partnerName={partnerName}
-        partnerAvatar={partnerAvatar}
-        partnerId={partnerId}
+        partnerName={connection.partner.full_name}
+        partnerAvatar={connection.partner.avatar_url}
+        callId={callId}
+        expiresAt={connection.call.expires_at}
         onEnd={handleCallEnd}
       />
     </LiveKitRoom>

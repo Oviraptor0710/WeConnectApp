@@ -23,3 +23,10 @@ app:
   brevo:
     api-key: test-key
     from-email: test@example.com
+  livekit:
+    url: wss://test.livekit.invalid
+    api-key: test-api-key
+    api-secret: test-api-secret-that-is-long-enough
+    token-ttl-ms: 600000
+  call:
+    ring-timeout-seconds: 35

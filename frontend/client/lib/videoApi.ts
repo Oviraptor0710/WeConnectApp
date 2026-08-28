@@ -1,70 +1,91 @@
 import { apiFetch } from "./api";
 
-// Backend returns { token: string } directly — no `data` wrapper on this endpoint
-interface VideoTokenResponse {
-  token: string;
+export type CallType = "AUDIO" | "VIDEO";
+export type CallStatus =
+  | "RINGING"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "MISSED"
+  | "ENDED";
+
+export interface CallUser {
+  user_id: number;
+  full_name: string;
+  avatar_url: string | null;
 }
 
-interface CallInviteResponse {
-  sent: boolean;
-}
-
-interface CallRejectResponse {
-  sent: boolean;
+export interface CallDetails {
+  call_id: number;
+  caller: CallUser;
+  receiver: CallUser;
+  call_type: CallType;
+  status: CallStatus;
+  created_at: string;
+  accepted_at: string | null;
+  ended_at: string | null;
+  expires_at: string;
 }
 
 export interface IncomingCallPayload {
-  room_name: string;
-  caller_id: number;
-  caller_name: string;
-  caller_avatar: string | null;
+  call_id: number;
+  caller: CallUser;
+  call_type: CallType;
+  expires_at: string;
 }
 
-/**
- * Fetch a LiveKit Access Token for the given room.
- * Calls backend POST /api/v1/video/token
- */
-export async function fetchVideoToken(roomName: string): Promise<string> {
-  const response = await apiFetch<VideoTokenResponse>("/api/v1/video/token", {
-    method: "POST",
-    body: JSON.stringify({ room_name: roomName }),
-  });
-  return response.token;
+export interface CallConnection {
+  call: CallDetails;
+  partner: CallUser;
+  server_url: string;
+  participant_token: string;
 }
 
-/**
- * Send an incoming-call Pusher notification to the callee.
- * Calls backend POST /api/v1/video/call/invite
- */
-export async function sendCallInvite(params: {
-  calleeId: number;
-  roomName: string;
-  callerName: string;
-  callerAvatar?: string | null;
-}): Promise<boolean> {
-  const response = await apiFetch<CallInviteResponse>("/api/v1/video/call/invite", {
+type DataResponse<T> = { data: T };
+
+export function createVideoCall(calleeId: number) {
+  return apiFetch<DataResponse<CallDetails>>("/api/v1/calls", {
     method: "POST",
-    body: JSON.stringify({
-      callee_id: params.calleeId,
-      room_name: params.roomName,
-      caller_name: params.callerName,
-      caller_avatar: params.callerAvatar ?? null,
-    }),
+    body: JSON.stringify({ callee_id: calleeId, type: "VIDEO" }),
   });
-  return response.sent;
 }
 
-/**
- * Notify the caller that the call was rejected or timed out.
- * Calls backend POST /api/v1/video/call/reject
- */
-export async function rejectCall(callerId: number, reason: "REJECTED" | "TIMEOUT" = "REJECTED"): Promise<boolean> {
-  const response = await apiFetch<CallRejectResponse>("/api/v1/video/call/reject", {
+export function getActiveIncomingCall() {
+  return apiFetch<DataResponse<IncomingCallPayload | null>>("/api/v1/calls/incoming/active");
+}
+
+export function getCall(callId: number) {
+  return apiFetch<DataResponse<CallDetails>>(`/api/v1/calls/${callId}`);
+}
+
+export function acceptCall(callId: number) {
+  return transition(callId, "accept");
+}
+
+export function rejectCall(callId: number) {
+  return transition(callId, "reject");
+}
+
+export function cancelCall(callId: number) {
+  return transition(callId, "cancel");
+}
+
+export function timeoutCall(callId: number) {
+  return transition(callId, "timeout");
+}
+
+export function endVideoCall(callId: number) {
+  return transition(callId, "end");
+}
+
+export function joinVideoCall(callId: number) {
+  return apiFetch<DataResponse<CallConnection>>(`/api/v1/calls/${callId}/join`, {
     method: "POST",
-    body: JSON.stringify({
-      caller_id: callerId,
-      reason: reason,
-    }),
   });
-  return response.sent;
+}
+
+function transition(callId: number, action: "accept" | "reject" | "cancel" | "timeout" | "end") {
+  return apiFetch<DataResponse<CallDetails>>(`/api/v1/calls/${callId}/${action}`, {
+    method: "POST",
+  });
 }

@@ -3,13 +3,25 @@ import http from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import crypto from 'crypto';
 
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS for internal API and WebSocket
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+// Browser chỉ được kết nối từ các origin đã cấu hình. Internal API còn có
+// shared secret riêng và không phụ thuộc CORS để bảo mật.
 const corsOptions = {
-    origin: '*', // Trong môi trường thực tế, nên giới hạn origin
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS origin is not allowed'));
+    },
     methods: ['GET', 'POST']
 };
 
@@ -25,7 +37,18 @@ if (!SECRET_KEY) {
     console.error("FATAL ERROR: SECRET_KEY is not set in environment variables.");
     process.exit(1);
 }
+const INTERNAL_SECRET = process.env.WS_INTERNAL_SECRET || SECRET_KEY;
 const PORT = process.env.PORT || 3000;
+
+function hasValidInternalSecret(request) {
+    const supplied = request.get('X-Internal-Secret') || '';
+    const expected = INTERNAL_SECRET || '';
+    const suppliedBuffer = Buffer.from(supplied);
+    const expectedBuffer = Buffer.from(expected);
+    return suppliedBuffer.length === expectedBuffer.length
+        && suppliedBuffer.length > 0
+        && crypto.timingSafeEqual(suppliedBuffer, expectedBuffer);
+}
 
 
 io.use((socket, next) => {
@@ -57,21 +80,6 @@ io.on('connection', (socket) => {
     const userRoom = `private-user-${socket.userId}`;
     socket.join(userRoom);
     console.log(`[Socket] User ${socket.userId} joined room: ${userRoom}`);
-    socket.on('subscribe_channel', (data) => {
-        const channelName = data.channel;
-        if (channelName && channelName.startsWith('private-conversation-')) {
-            socket.join(channelName);
-            console.log(`[Socket] User ${socket.userId} subscribed to channel: ${channelName}`);
-        }
-    });
-
-    socket.on('unsubscribe_channel', (data) => {
-        const channelName = data.channel;
-        if (channelName) {
-            socket.leave(channelName);
-            console.log(`[Socket] User ${socket.userId} unsubscribed from channel: ${channelName}`);
-        }
-    });
 
     // Khi client ngắt kết nối
     socket.on('disconnect', () => {
@@ -80,6 +88,10 @@ io.on('connection', (socket) => {
 });
 
 app.post('/internal/broadcast', (req, res) => {
+    if (!hasValidInternalSecret(req)) {
+        return res.status(401).json({ error: 'Invalid internal secret' });
+    }
+
     const { room, event, data } = req.body;
 
     if (!room || !event) {

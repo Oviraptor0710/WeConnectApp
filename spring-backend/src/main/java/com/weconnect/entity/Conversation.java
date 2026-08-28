@@ -7,7 +7,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "CONVERSATIONS")
+@Table(
+        name = "CONVERSATIONS",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_conversation",
+                columnNames = {"user1_id", "user2_id"}
+        )
+)
 @Data
 @NoArgsConstructor
 public class Conversation {
@@ -33,6 +39,41 @@ public class Conversation {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    public static Conversation between(User firstUser, User secondUser) {
+        if (firstUser.getUserId() == null || secondUser.getUserId() == null) {
+            throw new IllegalArgumentException("Người dùng phải được lưu trước khi tạo hội thoại");
+        }
+        if (firstUser.getUserId().equals(secondUser.getUserId())) {
+            throw new IllegalArgumentException("Không thể tự tạo hội thoại với chính mình");
+        }
+
+        Conversation conversation = new Conversation();
+        if (firstUser.getUserId() < secondUser.getUserId()) {
+            conversation.setUser1(firstUser);
+            conversation.setUser2(secondUser);
+        } else {
+            conversation.setUser1(secondUser);
+            conversation.setUser2(firstUser);
+        }
+        return conversation;
+    }
+
+    public boolean hasParticipant(Long userId) {
+        return user1.getUserId().equals(userId) || user2.getUserId().equals(userId);
+    }
+
+    public User otherParticipant(Long userId) {
+        if (user1.getUserId().equals(userId)) return user2;
+        if (user2.getUserId().equals(userId)) return user1;
+        throw new IllegalArgumentException("Người dùng không thuộc hội thoại");
+    }
+
+    public void touch(LocalDateTime messageTime) {
+        this.lastMessageAt = messageTime;
     }
 }

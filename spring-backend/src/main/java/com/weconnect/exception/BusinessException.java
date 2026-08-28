@@ -28,6 +28,10 @@ public class BusinessException extends RuntimeException {
         return new BusinessException(message, HttpStatus.UNAUTHORIZED);
     }
 
+    public static BusinessException forbidden(String message) {
+        return new BusinessException(message, HttpStatus.FORBIDDEN);
+    }
+
     // --- 409 Conflict: Email đã tồn tại ---
     public static BusinessException conflict(String message) {
         return new BusinessException(message, HttpStatus.CONFLICT);
@@ -53,5 +57,9 @@ public class BusinessException extends RuntimeException {
     // --- 502 Bad Gateway: Dịch vụ ngoài (Brevo) lỗi ---
     public static BusinessException badGateway(String message) {
         return new BusinessException(message, HttpStatus.BAD_GATEWAY);
+    }
+
+    public static BusinessException serviceUnavailable(String message) {
+        return new BusinessException(message, HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

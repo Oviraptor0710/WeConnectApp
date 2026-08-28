@@ -96,25 +96,29 @@ CREATE TABLE MESSAGES (
     conversation_id     BIGINT      NOT NULL,
     sender_id           BIGINT      NOT NULL,
     content             TEXT        NOT NULL,
-    message_type        VARCHAR(20) DEFAULT 'TEXT',   -- TEXT | IMAGE | FILE
+    message_type        VARCHAR(20) NOT NULL DEFAULT 'TEXT', -- TEXT | IMAGE | FILE | GAME_INVITE
     translated_content  TEXT        NULL,
     created_at          TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-    is_read             BOOLEAN     DEFAULT FALSE,
+    is_read             BOOLEAN     NOT NULL DEFAULT FALSE,
     FOREIGN KEY (conversation_id) REFERENCES CONVERSATIONS(conversation_id) ON DELETE CASCADE,
     FOREIGN KEY (sender_id)       REFERENCES USERS(user_id) ON DELETE CASCADE
 );
 
 -- ── 8. CALLS ─────────────────────────────────────────────────
 CREATE TABLE CALLS (
-    call_id     BIGINT      AUTO_INCREMENT PRIMARY KEY,
-    caller_id   BIGINT      NOT NULL,
-    receiver_id BIGINT      NOT NULL,
-    call_type   VARCHAR(10) DEFAULT 'AUDIO',  -- AUDIO | VIDEO
-    status      VARCHAR(20) DEFAULT 'MISSED', -- MISSED | ACCEPTED | REJECTED
-    start_time  TIMESTAMP   NULL,
-    end_time    TIMESTAMP   NULL,
+    call_id     BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    caller_id   BIGINT       NOT NULL,
+    receiver_id BIGINT       NOT NULL,
+    call_type   VARCHAR(10)  NOT NULL DEFAULT 'VIDEO',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'RINGING',
+    room_name   VARCHAR(255) NOT NULL,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    accepted_at TIMESTAMP    NULL,
+    ended_at    TIMESTAMP    NULL,
+    expires_at  TIMESTAMP    NOT NULL,
     FOREIGN KEY (caller_id)   REFERENCES USERS(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (receiver_id) REFERENCES USERS(user_id) ON DELETE CASCADE
+    FOREIGN KEY (receiver_id) REFERENCES USERS(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_call_room (room_name)
 );
 
 -- ── 9. EVENTS ────────────────────────────────────────────────
@@ -293,6 +297,12 @@ CREATE INDEX idx_users_role           ON USERS(role);
 CREATE INDEX idx_users_japanese_level ON USERS(japanese_level);
 
 CREATE INDEX idx_messages_conv_time   ON MESSAGES(conversation_id, created_at DESC);
+CREATE INDEX idx_messages_conv_id     ON MESSAGES(conversation_id, message_id);
+CREATE INDEX idx_messages_unread      ON MESSAGES(conversation_id, is_read, sender_id, message_id);
+CREATE INDEX idx_conversations_user1_last ON CONVERSATIONS(user1_id, last_message_at);
+CREATE INDEX idx_conversations_user2_last ON CONVERSATIONS(user2_id, last_message_at);
+CREATE INDEX idx_calls_caller_status ON CALLS(caller_id, status, expires_at);
+CREATE INDEX idx_calls_receiver_status ON CALLS(receiver_id, status, expires_at);
 
 CREATE INDEX idx_friend_req_receiver  ON FRIEND_REQUESTS(receiver_id, status);
 CREATE INDEX idx_friend_req_sender    ON FRIEND_REQUESTS(sender_id, status);

@@ -62,7 +62,7 @@ const App = () => (
               <Route path="/profile/:id" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
               <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
               <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-              <Route path="/call" element={<ProtectedRoute><Call /></ProtectedRoute>} />
+              <Route path="/call/:callId" element={<ProtectedRoute><Call /></ProtectedRoute>} />
               <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
               <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
               <Route path="/games" element={<ProtectedRoute><Games /></ProtectedRoute>} />
