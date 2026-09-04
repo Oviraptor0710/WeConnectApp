@@ -15,7 +15,9 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: none
+      # Flyway owns schema changes; Hibernate only verifies that MySQL still
+      # matches the JPA entities and fails fast when a migration is missing.
+      ddl-auto: validate
       naming:
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     show-sql: true
