@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Import sau railway_shiritori_migration.sql (bảng GAME_WORDS đã tồn tại)
 -- Total words: 195
--- Tạo lại: python backend/scripts/seed_shiritori_words_n3.py
+-- Bản chuẩn khi chạy ứng dụng nằm trong Spring classpath resources.
 -- ============================================================================
 
 INSERT INTO GAME_WORDS (hiragana, katakana, meaning_vi, category, jlpt_level, mora_count, first_kana, last_kana, difficulty) VALUES

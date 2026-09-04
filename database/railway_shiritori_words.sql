@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Chạy SAU file railway_shiritori_migration.sql
 -- An toàn chạy lại: ON DUPLICATE KEY UPDATE
--- Tạo lại từ: python backend/scripts/seed_shiritori_words.py
+-- Bản chuẩn khi chạy ứng dụng nằm trong Spring classpath resources.
 -- ============================================================================
 
 INSERT INTO GAME_WORDS (hiragana, katakana, meaning_vi, category, jlpt_level, mora_count, first_kana, last_kana, difficulty) VALUES

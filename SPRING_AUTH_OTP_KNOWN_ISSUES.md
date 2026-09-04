@@ -12,7 +12,7 @@ forgot password -> verify OTP -> reset password
 refresh session -> me -> logout
 ```
 
-FastAPI không còn xử lý route `/api/v1/auth/**`. Các module FastAPI và WebSocket chưa migrate vẫn nhận được JWT do Spring phát hành thông qua API Gateway.
+Spring Boot xử lý toàn bộ route `/api/v1/auth/**`. Realtime gateway nhận JWT do Spring phát hành thông qua API Gateway.
 
 ## Đã xử lý trong code
 
@@ -21,7 +21,7 @@ FastAPI không còn xử lý route `/api/v1/auth/**`. Các module FastAPI và We
 - Refresh token là opaque token, chỉ lưu SHA-256 hash trong `AUTH_SESSIONS`, được rotate khi refresh và revoke khi logout/reset password.
 - Password reset dùng opaque token một lần và có thời hạn riêng.
 - Hoàn thiện toàn bộ endpoint auth trên Spring, gồm `/me`, `/refresh`, forgot password và reset password.
-- Nginx route toàn bộ `/api/v1/auth/**` sang Spring; với route FastAPI/WebSocket cũ, gateway đổi cookie `accessToken` thành Bearer header.
+- Nginx route toàn bộ `/api/v1/auth/**` sang Spring; với kết nối WebSocket, gateway đổi cookie `accessToken` thành Bearer header.
 - Frontend gọi qua gateway, luôn gửi cookie, tự refresh một lần khi gặp 401 và khôi phục user qua `/auth/me` khi reload.
 - OTP dùng `SecureRandom`, có cooldown, giới hạn gửi, giới hạn số lần nhập sai, chỉ dùng một lần và vô hiệu hóa mã cũ.
 - Challenge OTP bị vô hiệu hóa nếu Brevo gửi mail thất bại.
@@ -69,7 +69,7 @@ ORDER BY installed_rank;
 
 ### 4. Production phải gọi API Gateway
 
-`VITE_API_URL` và `VITE_WS_URL` không được trỏ thẳng vào FastAPI hoặc WebSocket service. Chúng phải trỏ tới public URL của Nginx gateway, hoặc để trống nếu frontend và gateway dùng cùng origin.
+`VITE_API_URL` và `VITE_WS_URL` không được trỏ thẳng vào Spring hoặc WebSocket service nội bộ. Chúng phải trỏ tới public URL của Nginx gateway, hoặc để trống nếu frontend và gateway dùng cùng origin.
 
 Khi frontend và gateway khác origin:
 
@@ -87,7 +87,7 @@ Hiện mới có test contract JWT và test khởi động Spring context. Trư�
 2. Gửi OTP và xác nhận email đến từ Brevo.
 3. Verify OTP; kiểm tra browser có `accessToken` và `refreshToken` dạng HttpOnly.
 4. Reload trang; `/api/v1/auth/me` phải khôi phục user.
-5. Mở chat hoặc một API FastAPI cũ; request phải thành công mà frontend không cần đọc JWT.
+5. Mở chat hoặc một API Spring private; request phải thành công mà frontend không cần đọc JWT.
 6. Chờ/xóa access cookie rồi gọi API private; frontend phải refresh session đúng một lần.
 7. Logout; cả hai cookie bị xóa và refresh token trong DB có `revoked_at`.
 8. Chạy forgot password, verify OTP và reset; reset token không được dùng lại.

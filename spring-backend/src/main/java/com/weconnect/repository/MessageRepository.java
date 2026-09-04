@@ -1,8 +1,11 @@
 package com.weconnect.repository;
 
 import com.weconnect.entity.Message;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +18,29 @@ import java.util.Optional;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
     Optional<Message> findTopByConversation_ConversationIdOrderByMessageIdDesc(Long conversationId);
+
+    @EntityGraph(attributePaths = {"conversation", "conversation.user1", "conversation.user2", "sender"})
+    @Query("""
+            select m from Message m
+            where m.messageId = :messageId
+              and (m.conversation.user1.userId = :userId or m.conversation.user2.userId = :userId)
+            """)
+    Optional<Message> findForParticipant(
+            @Param("messageId") Long messageId,
+            @Param("userId") Long userId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"conversation", "conversation.user1", "conversation.user2", "sender"})
+    @Query("""
+            select m from Message m
+            where m.messageId = :messageId
+              and (m.conversation.user1.userId = :userId or m.conversation.user2.userId = :userId)
+            """)
+    Optional<Message> findForParticipantForUpdate(
+            @Param("messageId") Long messageId,
+            @Param("userId") Long userId
+    );
 
     @Query("""
             select m from Message m

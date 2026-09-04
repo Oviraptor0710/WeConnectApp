@@ -71,7 +71,7 @@ export async function apiFetch<T = unknown>(
       : await res.text().catch(() => "");
     console.error(`[apiFetch] Error for ${path}:`, errData);
 
-    // Tương thích đồng thời Spring ({message}) và FastAPI ({detail}).
+    // Chấp nhận cả error envelope hiện tại và payload detail kiểu cũ.
     let errMsg = `Lỗi hệ thống (${res.status})`;
     if (errData && errData.message) {
       errMsg = errData.message;

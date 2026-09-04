@@ -26,12 +26,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: 1
+    # 01_schema.sql is the canonical Spring schema through V6. Existing
+    # databases with Flyway history ignore this value; a legacy pre-Flyway
+    # database can still opt into the old upgrade path with version 1.
+    baseline-version: ${FLYWAY_BASELINE_VERSION:6}
     locations: classpath:db/migration
 
 # Cấu hình chung cho JWT (Áp dụng cho mọi môi trường)
 app:
-  # Spring và FastAPI cùng ghi/đọc named volume uploads_data trong Docker.
+  # Spring là owner duy nhất của named volume uploads_data trong Docker.
   upload-dir: ${UPLOAD_DIR:/app/uploads}
   cors:
     # Production: đặt CORS_ALLOWED_ORIGINS thành danh sách domain frontend, phân cách bằng dấu phẩy.
@@ -56,6 +59,8 @@ app:
     internal-url: ${WS_SERVER_INTERNAL_URL:http://ws_server:3000}
     # Có thể đặt key riêng ở production; dev tạm fallback về SECRET_KEY dùng chung.
     internal-secret: ${WS_INTERNAL_SECRET:${app.jwt.secret}}
+    connect-timeout-ms: ${WS_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${WS_READ_TIMEOUT_MS:5000}
   livekit:
     url: ${LIVEKIT_URL:}
     api-key: ${LIVEKIT_API_KEY:}
@@ -63,3 +68,12 @@ app:
     token-ttl-ms: 600000
   call:
     ring-timeout-seconds: 35
+  gemini:
+    # Secrets chỉ được đọc từ environment; không có giá trị mặc định trong source code.
+    api-key: ${GOOGLE_API_KEY:}
+    model: ${GEMINI_MODEL:}
+    timeout-ms: 15000
+    max-input-characters: 5000
+    rate-limit:
+      max-requests: 20
+      window-seconds: 60

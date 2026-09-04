@@ -9,6 +9,7 @@ import com.weconnect.dto.chat.response.MessageListResponse;
 import com.weconnect.dto.common.response.PaginationResponse;
 import com.weconnect.entity.Conversation;
 import com.weconnect.entity.Message;
+import com.weconnect.entity.MessageTranslation;
 import com.weconnect.entity.User;
 import com.weconnect.exception.BusinessException;
 import com.weconnect.realtime.RealtimeEvent;
@@ -16,6 +17,7 @@ import com.weconnect.realtime.WsBroadcastClient;
 import com.weconnect.repository.ConversationRepository;
 import com.weconnect.repository.FriendshipRepository;
 import com.weconnect.repository.MessageRepository;
+import com.weconnect.repository.MessageTranslationRepository;
 import com.weconnect.repository.UserRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 public class ChatService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
+    private final MessageTranslationRepository messageTranslationRepository;
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
     private final MediaStorageService mediaStorageService;
@@ -49,6 +52,7 @@ public class ChatService {
     public ChatService(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
+            MessageTranslationRepository messageTranslationRepository,
             UserRepository userRepository,
             FriendshipRepository friendshipRepository,
             MediaStorageService mediaStorageService,
@@ -57,6 +61,7 @@ public class ChatService {
     ) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
+        this.messageTranslationRepository = messageTranslationRepository;
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.mediaStorageService = mediaStorageService;
@@ -142,8 +147,26 @@ public class ChatService {
             nextCursor = messages.size() == limit ? messages.get(0).getMessageId() : null;
         }
 
+        Map<Long, String> translations = messages.isEmpty()
+                ? Map.of()
+                : messageTranslationRepository
+                .findAllByMessage_MessageIdInOrderByCreatedAtDesc(
+                        messages.stream().map(Message::getMessageId).toList()
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        translation -> translation.getMessage().getMessageId(),
+                        MessageTranslation::getTranslatedContent,
+                        (newest, ignoredOlder) -> newest
+                ));
+
         return new MessageListResponse(
-                messages.stream().map(ChatMessageResponse::from).toList(),
+                messages.stream()
+                        .map(message -> ChatMessageResponse.from(
+                                message,
+                                translations.get(message.getMessageId())
+                        ))
+                        .toList(),
                 nextCursor
         );
     }

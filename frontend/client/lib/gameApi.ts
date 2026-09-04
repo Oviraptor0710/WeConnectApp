@@ -1,4 +1,4 @@
-import Pusher from "pusher-js";
+import { io, Socket } from "socket.io-client";
 import { apiFetch, API_BASE_URL } from "./api";
 
 export interface QuestionOut {
@@ -83,30 +83,31 @@ export interface GameRoomHandlers {
   onReady?: (d: { user_id: number; is_ready: boolean }) => void;
 }
 
-export interface PusherConfig { key: string; cluster: string; auth_endpoint: string; }
-
-// Returns an unsubscribe function, or a no-op if Pusher is not configured.
+// Game events use the same authenticated Socket.IO transport as chat.
 export async function subscribeGameRoom(roomId: number, handlers: GameRoomHandlers): Promise<() => void> {
-  let config: { data: PusherConfig };
-  try {
-    config = await apiFetch<{ data: PusherConfig }>("/api/v1/pusher/config");
-  } catch {
-    return () => {};
-  }
-  const pusher = new Pusher(config.data.key, {
-    cluster: config.data.cluster,
-    authEndpoint: `${API_BASE_URL}${config.data.auth_endpoint}`,
+  const socket: Socket = io((API_BASE_URL || window.location.origin), {
+    withCredentials: true,
+    transports: ["websocket"],
   });
-  const channel = pusher.subscribe(`private-game-room-${roomId}`);
-  const bind = <T>(evt: string, cb?: (d: T) => void) => { if (cb) channel.bind(evt, cb); };
-  bind("game:score", handlers.onScore);
-  bind("game:message", handlers.onMessage);
-  bind("game:started", handlers.onStarted);
-  bind("game:paused", handlers.onPaused);
-  bind("game:resumed", handlers.onResumed);
-  bind("game:ended", handlers.onEnded);
-  bind("game:player-joined", handlers.onPlayerJoined);
-  bind("game:player-left", handlers.onPlayerLeft);
-  bind("game:ready", handlers.onReady);
-  return () => { pusher.unsubscribe(`private-game-room-${roomId}`); pusher.disconnect(); };
+  const events: Array<[string, ((data: any) => void) | undefined]> = [
+    ["game:score", handlers.onScore],
+    ["game:message", handlers.onMessage],
+    ["game:started", handlers.onStarted],
+    ["game:paused", handlers.onPaused],
+    ["game:resumed", handlers.onResumed],
+    ["game:ended", handlers.onEnded],
+    ["game:player-joined", handlers.onPlayerJoined],
+    ["game:player-left", handlers.onPlayerLeft],
+    ["game:ready", handlers.onReady],
+  ];
+  const listeners = events
+    .filter(([, callback]) => callback)
+    .map(([event, callback]) => [event, (data: any) => {
+      if (Number(data?.room_id) === roomId) callback?.(data);
+    }] as [string, (data: any) => void]);
+  listeners.forEach(([event, callback]) => socket.on(event, callback));
+  return () => {
+    listeners.forEach(([event, callback]) => socket.off(event, callback));
+    socket.disconnect();
+  };
 }

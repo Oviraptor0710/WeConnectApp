@@ -31,10 +31,7 @@ public class JwtUtil {
         this.accessExpirationMs = accessExpirationMs;
     }
 
-    /**
-     * Contract dùng chung trong giai đoạn Strangler:
-     * sub=user_id, type=access. FastAPI và WebSocket cũ đều hiểu contract này.
-     */
+    /** Contract dùng chung giữa Spring và realtime gateway: sub=user_id, type=access. */
     public String generateAccessToken(User user) {
         return buildToken(
                 user.getUserId().toString(),

@@ -75,6 +75,7 @@ export function useShiritoriRoom(roomCode: string) {
   useEffect(() => {
     if (!roomId) return;
     let cleanup = () => {};
+    let disposed = false;
     subscribeShiritoriRoom(roomId, {
       onWord: () => { skipSentRef.current = false; refetchState(); },
       onTurn: () => { skipSentRef.current = false; refetchState(); },
@@ -87,8 +88,11 @@ export function useShiritoriRoom(roomCode: string) {
         prev.some((x) => x.id === m.message_id) ? prev :
         [...prev, { id: m.message_id, name: m.sender_name, text: m.content,
           type: m.sender_id === currentUser?.user_id ? "me" : "other" }]),
-    }).then((fn) => { cleanup = fn; });
-    return () => cleanup();
+    }).then((fn) => {
+      if (disposed) fn();
+      else cleanup = fn;
+    });
+    return () => { disposed = true; cleanup(); };
   }, [roomId, currentUser?.user_id, refetchState]);
 
   const effectiveNow = nowMs + serverOffsetMs;

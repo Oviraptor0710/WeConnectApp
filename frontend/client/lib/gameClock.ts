@@ -1,4 +1,4 @@
-// Pure timing helpers. MUST stay in sync with backend/app/utils/game_engine.py.
+// Pure timing helpers. Keep these values in sync with GameService constants.
 export const ANSWER_WINDOW_SECONDS = 10;
 export const REVEAL_SECONDS = 3;
 export const CYCLE_SECONDS = ANSWER_WINDOW_SECONDS + REVEAL_SECONDS; // 13

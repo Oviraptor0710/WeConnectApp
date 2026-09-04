@@ -90,7 +90,7 @@ public class UserProfileService {
         if (request.isProvided("education")) user.setEducation(request.getEducation());
         if (request.isProvided("relationship_status")) user.setRelationshipStatus(request.getRelationshipStatus());
 
-        // FastAPI cũ bỏ qua null ở hai field này; giữ đúng hành vi để không phá contract.
+        // Bỏ qua null ở hai field này để giữ nguyên contract cập nhật từng phần.
         if (request.isProvided("gender") && request.getGender() != null) user.setGender(request.getGender());
         if (request.isProvided("date_of_birth") && request.getDateOfBirth() != null) {
             user.setDateOfBirth(request.getDateOfBirth());
@@ -382,7 +382,7 @@ public class UserProfileService {
             try {
                 ids.add(Integer.parseInt(value.trim()));
             } catch (NumberFormatException ignored) {
-                // FastAPI cũ cũng bỏ qua các phần tử không phải số.
+                // Bỏ qua các phần tử không phải số trong payload sở thích.
             }
         }
         return ids;

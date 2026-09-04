@@ -10,7 +10,12 @@ interface UseChatSocketProps {
   onNewMessage: (message: ChatMessage) => void;
   onTyping: (payload: { conversation_id: number; user_id: number; is_typing: boolean }) => void;
   onRead: (payload: { conversation_id: number; user_id: number; last_read_message_id?: number | null }) => void;
-  onTranslated: (payload: { message_id: number; translated_content: string }) => void;
+  onTranslated: (payload: {
+    message_id: number;
+    translated_content: string;
+    source_language: "VI" | "JA";
+    target_language: "VI" | "JA";
+  }) => void;
   onConversationUpdated: (conversation: ChatConversation) => void;
 }
 
@@ -69,7 +74,12 @@ export function useChatSocket({
       callbacksRef.current.onTyping(payload);
     const handleRead = (payload: { conversation_id: number; user_id: number; last_read_message_id?: number | null }) =>
       callbacksRef.current.onRead(payload);
-    const handleTranslated = (payload: { message_id: number; translated_content: string }) =>
+    const handleTranslated = (payload: {
+      message_id: number;
+      translated_content: string;
+      source_language: "VI" | "JA";
+      target_language: "VI" | "JA";
+    }) =>
       callbacksRef.current.onTranslated(payload);
     const handleConversationUpdated = (payload: ChatConversation) =>
       callbacksRef.current.onConversationUpdated(payload);

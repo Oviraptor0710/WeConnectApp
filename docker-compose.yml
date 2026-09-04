@@ -23,26 +23,6 @@ services:
       start_period: 30s
     command: --port=3308 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
 
-  backend:
-    build: ./backend
-    container_name: weconnect_backend
-    restart: unless-stopped
-    env_file:
-      - ./backend/.env
-    environment:
-      # Spring là token issuer; legacy FastAPI chỉ verify bằng cùng key.
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: HS256
-    ports:
-      - "8001:8001"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - uploads_data:/app/uploads
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-
   ws_server:
     build: ./ws-server
     container_name: weconnect_ws_server
@@ -50,7 +30,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       - PORT=3000
       - SECRET_KEY=${SECRET_KEY}
@@ -59,6 +39,10 @@ services:
     volumes:
       - ./ws-server:/app
       - /app/node_modules
+    networks:
+      default:
+        aliases:
+          - ws-server
 
   api_gateway:
     image: nginx:alpine
@@ -69,7 +53,6 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - backend
       - ws_server
       - spring_backend
 

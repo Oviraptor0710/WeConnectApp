@@ -36,7 +36,7 @@ export function useGameRoom(roomCode: string) {
     queryKey: ["game-state", roomId],
     queryFn: () => getGameState(roomId!),
     enabled: !!roomId,
-    refetchInterval: 4000, // fallback when Pusher is unavailable
+    refetchInterval: 4000, // polling fallback if the realtime connection is unavailable
   });
 
   // Join the room when landing on the page (invite link, shared code, refresh).
@@ -88,6 +88,7 @@ export function useGameRoom(roomCode: string) {
   useEffect(() => {
     if (!roomId) return;
     let cleanup = () => {};
+    let disposed = false;
     subscribeGameRoom(roomId, {
       onScore: (d) => setLeaderboard(d.leaderboard),
       onEnded: (d) => { setLeaderboard(d.leaderboard); refetchState(); },
@@ -101,8 +102,11 @@ export function useGameRoom(roomCode: string) {
         prev.some((x) => x.id === m.message_id) ? prev :
         [...prev, { id: m.message_id, name: m.sender_name, text: m.content,
           type: m.sender_id === currentUser?.user_id ? "me" : "other" }]),
-    }).then((fn) => { cleanup = fn; });
-    return () => cleanup();
+    }).then((fn) => {
+      if (disposed) fn();
+      else cleanup = fn;
+    });
+    return () => { disposed = true; cleanup(); };
   }, [roomId, currentUser?.user_id, refetchState]);
 
   // derived clock

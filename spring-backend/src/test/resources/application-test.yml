@@ -15,6 +15,7 @@ spring:
     show-sql: false
 
 app:
+  upload-dir: ${java.io.tmpdir}/weconnect-test-uploads
   jwt:
     secret: "test-secret-key-that-is-long-enough-for-hs256"
     issuer: weconnect-auth
@@ -30,3 +31,11 @@ app:
     token-ttl-ms: 600000
   call:
     ring-timeout-seconds: 35
+  gemini:
+    api-key:
+    model:
+    timeout-ms: 1000
+    max-input-characters: 5000
+    rate-limit:
+      max-requests: 1000
+      window-seconds: 60

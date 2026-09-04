@@ -1,4 +1,4 @@
-import Pusher from "pusher-js";
+import { io, Socket } from "socket.io-client";
 import { apiFetch, API_BASE_URL } from "./api";
 import type { LeaderboardEntry } from "./gameApi";
 
@@ -124,28 +124,31 @@ export async function subscribeShiritoriRoom(
   roomId: number,
   handlers: ShiritoriRoomHandlers
 ): Promise<() => void> {
-  let config: { data: { key: string; cluster: string; auth_endpoint: string } };
-  try {
-    config = await apiFetch("/api/v1/pusher/config");
-  } catch {
-    return () => {};
-  }
-  const pusher = new Pusher(config.data.key, {
-    cluster: config.data.cluster,
-    authEndpoint: `${API_BASE_URL}${config.data.auth_endpoint}`,
+  const socket: Socket = io((API_BASE_URL || window.location.origin), {
+    withCredentials: true,
+    transports: ["websocket"],
   });
-  const channel = pusher.subscribe(`private-game-room-${roomId}`);
-  const bind = <T>(evt: string, cb?: (d: T) => void) => { if (cb) channel.bind(evt, cb); };
-  bind("game:shiritori-word", handlers.onWord);
-  bind("game:shiritori-turn", handlers.onTurn);
-  bind("game:shiritori-invalid", handlers.onInvalid);
-  bind("game:started", handlers.onStarted);
-  bind("game:ended", handlers.onEnded);
-  bind("game:player-joined", handlers.onPlayerJoined);
-  bind("game:player-left", handlers.onPlayerLeft);
-  bind("game:ready", handlers.onReady);
-  bind("game:message", handlers.onMessage);
-  return () => { pusher.unsubscribe(`private-game-room-${roomId}`); pusher.disconnect(); };
+  const events: Array<[string, ((data: any) => void) | undefined]> = [
+    ["game:shiritori-word", handlers.onWord],
+    ["game:shiritori-turn", handlers.onTurn],
+    ["game:shiritori-invalid", handlers.onInvalid],
+    ["game:started", handlers.onStarted],
+    ["game:ended", handlers.onEnded],
+    ["game:player-joined", handlers.onPlayerJoined],
+    ["game:player-left", handlers.onPlayerLeft],
+    ["game:ready", handlers.onReady],
+    ["game:message", handlers.onMessage],
+  ];
+  const listeners = events
+    .filter(([, callback]) => callback)
+    .map(([event, callback]) => [event, (data: any) => {
+      if (Number(data?.room_id) === roomId) callback?.(data);
+    }] as [string, (data: any) => void]);
+  listeners.forEach(([event, callback]) => socket.on(event, callback));
+  return () => {
+    listeners.forEach(([event, callback]) => socket.off(event, callback));
+    socket.disconnect();
+  };
 }
 
 export const TURN_SECONDS_MIN = 5;

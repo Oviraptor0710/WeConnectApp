@@ -1,5 +1,6 @@
 package com.weconnect.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -11,6 +12,14 @@ import java.time.Duration;
 
 @Configuration
 public class AppConfig {
+
+    // Legacy JSON columns (GAME_ROOMS) use Jackson 2 directly. Spring Boot 4
+    // uses Jackson 3 for HTTP conversion, so expose an explicit mapper for
+    // services that serialize/deserialize those database JSON strings.
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
+    }
 
     // Công cụ băm mật khẩu (BCrypt) - Chuẩn công nghiệp bảo mật
     @Bean

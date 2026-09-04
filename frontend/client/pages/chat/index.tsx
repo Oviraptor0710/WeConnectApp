@@ -1439,18 +1439,10 @@ function ChatWindow({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-function getTargetLanguage(i18nLanguage: string): "VI" | "JA" | "EN" {
-  const lang = i18nLanguage.split("-")[0].toLowerCase();
-  if (lang === "vi") return "VI";
-  if (lang === "ja" || lang === "jp") return "JA";
-  return "EN";
-}
-
 function getTargetLanguageLabel(i18nLanguage: string): string {
   const lang = i18nLanguage.split("-")[0].toLowerCase();
-  if (lang === "vi") return "Tiếng Việt";
   if (lang === "ja" || lang === "jp") return "日本語";
-  return "English";
+  return "Tiếng Việt";
 }
 
 function getDynamicTargetLanguageLabel(translatedText: string | undefined, originalText: string, i18nLanguage: string): string {
@@ -1474,7 +1466,6 @@ export default function Index() {
   const [translatingIds, setTranslatingIds] = useState<Set<number>>(new Set());
   const lastTypingStateRef = useRef(false);
   const [showChatWindowOnMobile, setShowChatWindowOnMobile] = useState(false);
-  const { i18n } = useTranslation();
 
   const activeConv = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConvId) ?? null,
@@ -1708,7 +1699,7 @@ export default function Index() {
   const handleTranslate = async (messageId: number) => {
     setTranslatingIds((items) => new Set(items).add(messageId));
     try {
-      const response = await translateMessage(messageId, getTargetLanguage(i18n.language));
+      const response = await translateMessage(messageId);
       setMessages((items) =>
         items.map((message) =>
           message.messageId === messageId

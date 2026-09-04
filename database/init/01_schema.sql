@@ -104,6 +104,24 @@ CREATE TABLE MESSAGES (
     FOREIGN KEY (sender_id)       REFERENCES USERS(user_id) ON DELETE CASCADE
 );
 
+-- Mỗi message có thể có một bản dịch riêng cho từng ngôn ngữ đích.
+CREATE TABLE MESSAGE_TRANSLATIONS (
+    translation_id       BIGINT       AUTO_INCREMENT PRIMARY KEY,
+    message_id           BIGINT       NOT NULL,
+    source_language      VARCHAR(10)  NOT NULL,
+    target_language      VARCHAR(10)  NOT NULL,
+    translated_content   TEXT         NOT NULL,
+    provider             VARCHAR(30)  NOT NULL,
+    model_name           VARCHAR(100) NOT NULL,
+    created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (message_id) REFERENCES MESSAGES(message_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_message_translation (message_id, target_language),
+    CONSTRAINT chk_message_translation_source_language
+        CHECK (source_language IN ('VI', 'JA')),
+    CONSTRAINT chk_message_translation_target_language
+        CHECK (target_language IN ('VI', 'JA'))
+);
+
 -- ── 8. CALLS ─────────────────────────────────────────────────
 CREATE TABLE CALLS (
     call_id     BIGINT       AUTO_INCREMENT PRIMARY KEY,
@@ -303,7 +321,6 @@ CREATE INDEX idx_conversations_user1_last ON CONVERSATIONS(user1_id, last_messag
 CREATE INDEX idx_conversations_user2_last ON CONVERSATIONS(user2_id, last_message_at);
 CREATE INDEX idx_calls_caller_status ON CALLS(caller_id, status, expires_at);
 CREATE INDEX idx_calls_receiver_status ON CALLS(receiver_id, status, expires_at);
-
 CREATE INDEX idx_friend_req_receiver  ON FRIEND_REQUESTS(receiver_id, status);
 CREATE INDEX idx_friend_req_sender    ON FRIEND_REQUESTS(sender_id, status);
 CREATE INDEX idx_friendships_user1    ON FRIENDSHIPS(user1_id);

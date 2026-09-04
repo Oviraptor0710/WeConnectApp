@@ -1,47 +1,13 @@
--- Migration: game multiplayer. Apply once to an existing weconnect DB.
--- Safe to run against a DB where GAME_ROOMS.started_at already exists
--- (the ADD COLUMN for started_at is wrapped to ignore "duplicate column").
+-- Seed multiplayer games and questions for a newly initialized database.
+-- Tables and columns are owned by 01_schema.sql; keeping DDL out of this file
+-- prevents duplicate-column/index failures during first-time Docker startup.
 
--- 1. Columns -----------------------------------------------------------
-ALTER TABLE GAME_ROOMS  ADD COLUMN paused_at    TIMESTAMP NULL;
-ALTER TABLE GAME_ROOMS  ADD COLUMN ended_at     TIMESTAMP NULL;
-ALTER TABLE GAME_ROOMS  ADD COLUMN question_ids JSON      NULL;
-ALTER TABLE GAME_PARTICIPANTS ADD COLUMN is_ready BOOLEAN DEFAULT FALSE;
-
--- 2. New tables --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS GAME_QUESTIONS (
-    question_id   BIGINT       AUTO_INCREMENT PRIMARY KEY,
-    game_type     VARCHAR(50)  NOT NULL,
-    category      VARCHAR(100) NOT NULL,
-    question      TEXT         NOT NULL,
-    description   VARCHAR(255),
-    options       JSON         NOT NULL,
-    correct_index TINYINT      NOT NULL,
-    hint          VARCHAR(255),
-    difficulty    TINYINT      DEFAULT 1
-);
-CREATE INDEX idx_game_questions_type ON GAME_QUESTIONS(game_type);
-
-CREATE TABLE IF NOT EXISTS GAME_ANSWERS (
-    answer_id      BIGINT    AUTO_INCREMENT PRIMARY KEY,
-    room_id        BIGINT    NOT NULL,
-    user_id        BIGINT    NOT NULL,
-    question_index INT       NOT NULL,
-    selected_index TINYINT   NOT NULL,
-    is_correct     BOOLEAN   NOT NULL,
-    points         INT       NOT NULL DEFAULT 0,
-    answered_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_answer_room_user_q (room_id, user_id, question_index),
-    FOREIGN KEY (room_id) REFERENCES GAME_ROOMS(room_id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES USERS(user_id)     ON DELETE CASCADE
-);
-
--- 3. KANJI game row (so it appears in the lobby) -----------------------
+-- 1. KANJI game row (so it appears in the lobby) -----------------------
 INSERT INTO GAMES (game_id, name, description, game_type, icon_bg, badge_bg, badge_text) VALUES
 ('kanji', 'Luyện đọc Kanji', 'Trắc nghiệm Kanji • 2-4 người', 'KANJI', 'bg-orange-100', 'bg-orange-50', 'text-orange-500')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- 4. Question bank -----------------------------------------------------
+-- 2. Question bank -----------------------------------------------------
 INSERT INTO GAME_QUESTIONS (game_type, category, question, description, options, correct_index, hint, difficulty) VALUES
 ('QUIZ','Văn hóa Nhật Bản','Thủ đô của Nhật Bản hiện nay là thành phố nào?','Trung tâm chính trị và kinh tế của Nhật',JSON_ARRAY('A. Osaka','B. Kyoto','C. Tokyo','D. Nagoya'),2,'Thành phố lớn nhất Nhật Bản.',1),
 ('QUIZ','Văn hóa Nhật Bản','Ngọn núi cao nhất và là biểu tượng của Nhật Bản tên là gì?','Cao 3.776 mét',JSON_ARRAY('A. Núi Phú Sĩ','B. Núi Aso','C. Núi Tate','D. Núi Kita'),0,'Một ngọn núi lửa đang ngủ yên.',1),

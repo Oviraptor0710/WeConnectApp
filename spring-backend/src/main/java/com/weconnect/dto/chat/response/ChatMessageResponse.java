@@ -15,13 +15,17 @@ public record ChatMessageResponse(
         @JsonProperty("is_read") boolean isRead
 ) {
     public static ChatMessageResponse from(Message message) {
+        return from(message, message.getTranslatedContent());
+    }
+
+    public static ChatMessageResponse from(Message message, String translatedContent) {
         return new ChatMessageResponse(
                 message.getMessageId(),
                 message.getConversation().getConversationId(),
                 message.getSender().getUserId(),
                 message.getContent(),
                 message.getMessageType(),
-                message.getTranslatedContent(),
+                translatedContent,
                 message.getCreatedAt().toString(),
                 Boolean.TRUE.equals(message.getIsRead())
         );

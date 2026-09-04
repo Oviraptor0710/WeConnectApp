@@ -57,6 +57,7 @@ public class SecurityConfig {
                         "/api/v1/auth/forgot-password",
                         "/api/v1/auth/reset-password"
                 ).permitAll()
+                .requestMatchers("/static/**", "/uploads/**", "/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/hobbies").permitAll()
                 .requestMatchers("/api/v1/auth/me").authenticated()
                 .anyRequest().authenticated()
