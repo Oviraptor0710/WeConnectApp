@@ -75,16 +75,18 @@ Pusher.
 
 ## Kiến trúc hệ thống
 
-```mermaid
-flowchart LR
-    Browser[React Web App] -->|HTTP / WebSocket| Gateway[Nginx API Gateway]
-    Gateway -->|REST / static / uploads| Spring[Spring Boot API]
-    Gateway -->|Socket.IO| Realtime[Node.js Realtime Gateway]
-    Spring -->|JPA / JDBC| MySQL[(MySQL 8)]
-    Spring -->|Internal broadcast| Realtime
-    Spring -->|OTP email| Brevo[Brevo]
-    Spring -->|Translation| Gemini[Google Gemini]
-    Spring -->|Room token| LiveKit[LiveKit]
+```text
+React Web App
+      │
+      │ HTTP / Socket.IO
+      ▼
+Nginx API Gateway
+      ├── REST, static, uploads ──► Spring Boot API ──► MySQL 8
+      │                                  ├── OTP email ──► Brevo
+      │                                  ├── Translation ──► Google Gemini
+      │                                  ├── Room token ──► LiveKit
+      │                                  └── Internal broadcast ─┐
+      └── Socket.IO ──► Node.js Realtime Gateway ◄───────────────┘
 ```
 
 ### Phân chia trách nhiệm
