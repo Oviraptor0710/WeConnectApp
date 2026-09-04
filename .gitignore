@@ -243,6 +243,11 @@ backend/uploads/*
 
 # Docs build output
 docs/
+!docs/
+docs/*
+!docs/assets/
+docs/assets/*
+!docs/assets/weconnect-system-architecture.png
 .claude/
 CLASS_DIAGRAM_overview.md
 USECASE_DIAGRAM_overview.md
