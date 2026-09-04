@@ -75,19 +75,7 @@ Pusher.
 
 ## Kiến trúc hệ thống
 
-```text
-React Web App
-      │
-      │ HTTP / Socket.IO
-      ▼
-Nginx API Gateway
-      ├── REST, static, uploads ──► Spring Boot API ──► MySQL 8
-      │                                  ├── OTP email ──► Brevo
-      │                                  ├── Translation ──► Google Gemini
-      │                                  ├── Room token ──► LiveKit
-      │                                  └── Internal broadcast ─┐
-      └── Socket.IO ──► Node.js Realtime Gateway ◄───────────────┘
-```
+![Sơ đồ kiến trúc hệ thống WeConnect](docs/assets/weconnect-system-architecture.png)
 
 ### Phân chia trách nhiệm
 
